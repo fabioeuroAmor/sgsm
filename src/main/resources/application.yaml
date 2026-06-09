@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: sgsm
+
+  datasource:
+    hikari:
+      connectionTimeout: 20000
+      maximumPoolSize: 5
+    url: jdbc:postgresql://localhost:5432/postgres?stringtype=unspecified
+    username: postgres
+    password: postgres
+  jpa:
+    show-sql: true
