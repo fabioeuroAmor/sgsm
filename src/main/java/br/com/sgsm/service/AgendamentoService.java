@@ -172,12 +172,14 @@ public class AgendamentoService {
     public List<AgendamentoResponse> listar(UUID pacienteId, StatusAgendamento status, UUID medicoId) {
         List<Agendamento> resultado;
 
-        if (pacienteId != null && status != null) {
+        if (medicoId != null && status != null) {
+            resultado = agendamentoRepository.findAllByMedicoIdAndStatus(medicoId, status);
+        } else if (pacienteId != null && status != null) {
             resultado = agendamentoRepository.findAllByPacienteIdAndStatus(pacienteId, status);
-        } else if (pacienteId != null) {
-            resultado = agendamentoRepository.findAllByPacienteId(pacienteId);
         } else if (medicoId != null) {
             resultado = agendamentoRepository.findAllByMedicoId(medicoId);
+        } else if (pacienteId != null) {
+            resultado = agendamentoRepository.findAllByPacienteId(pacienteId);
         } else if (status != null) {
             resultado = agendamentoRepository.findAllByStatus(status);
         } else {
