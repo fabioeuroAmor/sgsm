@@ -4,8 +4,10 @@ import br.com.sgsm.domain.Medico;
 import br.com.sgsm.dto.AtualizarMedicoRequest;
 import br.com.sgsm.dto.CadastrarMedicoRequest;
 import br.com.sgsm.dto.MedicoResponse;
+import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.MedicoRepository;
+import br.com.sgsm.security.ContextoSeguranca;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,10 +21,12 @@ public class MedicoService {
 
     private final MedicoRepository repository;
     private final ModelMapper modelMapper;
+    private final ContextoSeguranca contextoSeguranca;
 
-    public MedicoService(MedicoRepository repository, ModelMapper modelMapper) {
+    public MedicoService(MedicoRepository repository, ModelMapper modelMapper, ContextoSeguranca contextoSeguranca) {
         this.repository = repository;
         this.modelMapper = modelMapper;
+        this.contextoSeguranca = contextoSeguranca;
     }
 
     public MedicoResponse cadastrar(CadastrarMedicoRequest request) {
@@ -42,12 +46,20 @@ public class MedicoService {
 
     @Transactional(readOnly = true)
     public MedicoResponse consultar(UUID id) {
+        UUID ref = contextoSeguranca.getReferenciaId();
+        if (contextoSeguranca.isMedico() && !id.equals(ref)) {
+            throw new AcessoNegadoException("Acesso negado ao médico: " + id);
+        }
         return repository.findById(id)
                 .map(m -> modelMapper.map(m, MedicoResponse.class))
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Médico não encontrado: " + id));
     }
 
     public MedicoResponse atualizar(UUID id, AtualizarMedicoRequest request) {
+        UUID ref = contextoSeguranca.getReferenciaId();
+        if (contextoSeguranca.isMedico() && !id.equals(ref)) {
+            throw new AcessoNegadoException("Médico não pode editar dados de outro médico: " + id);
+        }
         var medico = buscarOuLancarErro(id);
 
         if (request.email() != null && repository.existsByEmailAndIdNot(request.email(), id)) {
@@ -67,6 +79,12 @@ public class MedicoService {
 
     @Transactional(readOnly = true)
     public List<MedicoResponse> listar(Boolean ativo, String especialidade) {
+        if (contextoSeguranca.isMedico()) {
+            return repository.findById(contextoSeguranca.getReferenciaId())
+                    .map(m -> List.of(modelMapper.map(m, MedicoResponse.class)))
+                    .orElse(List.of());
+        }
+
         List<Medico> resultado;
 
         if (especialidade != null && ativo != null) {

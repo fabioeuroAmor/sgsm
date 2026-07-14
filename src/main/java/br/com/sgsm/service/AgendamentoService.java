@@ -2,8 +2,10 @@ package br.com.sgsm.service;
 
 import br.com.sgsm.domain.*;
 import br.com.sgsm.dto.*;
+import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.*;
+import br.com.sgsm.security.ContextoSeguranca;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +32,7 @@ public class AgendamentoService {
     private final EstabelecimentoRepository estabelecimentoRepository;
     private final PacienteRepository pacienteRepository;
     private final ModelMapper modelMapper;
+    private final ContextoSeguranca contextoSeguranca;
 
     public AgendamentoService(
             AgendamentoRepository agendamentoRepository,
@@ -40,7 +43,8 @@ public class AgendamentoService {
             MedicoRepository medicoRepository,
             EstabelecimentoRepository estabelecimentoRepository,
             PacienteRepository pacienteRepository,
-            ModelMapper modelMapper) {
+            ModelMapper modelMapper,
+            ContextoSeguranca contextoSeguranca) {
         this.agendamentoRepository = agendamentoRepository;
         this.agendaMedicoRepository = agendaMedicoRepository;
         this.bloqueioAgendaRepository = bloqueioAgendaRepository;
@@ -50,6 +54,7 @@ public class AgendamentoService {
         this.estabelecimentoRepository = estabelecimentoRepository;
         this.pacienteRepository = pacienteRepository;
         this.modelMapper = modelMapper;
+        this.contextoSeguranca = contextoSeguranca;
     }
 
     @Transactional(readOnly = true)
@@ -127,6 +132,13 @@ public class AgendamentoService {
     }
 
     public AgendamentoResponse cadastrar(CadastrarAgendamentoRequest request) {
+        if (contextoSeguranca.isPaciente()) {
+            UUID ref = contextoSeguranca.getReferenciaId();
+            if (!ref.equals(request.pacienteId())) {
+                throw new AcessoNegadoException("Paciente não pode agendar para outro paciente.");
+            }
+        }
+
         var servico = servicoMedicoRepository.findById(request.servicoMedicoId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "ServicoMedico não encontrado: " + request.servicoMedicoId()));
@@ -165,11 +177,19 @@ public class AgendamentoService {
 
     @Transactional(readOnly = true)
     public AgendamentoResponse consultar(UUID id) {
-        return toResponse(buscarOuLancarErro(id));
+        var agendamento = buscarOuLancarErro(id);
+        validarAcesso(agendamento);
+        return toResponse(agendamento);
     }
 
     @Transactional(readOnly = true)
     public List<AgendamentoResponse> listar(UUID pacienteId, StatusAgendamento status, UUID medicoId) {
+        if (contextoSeguranca.isMedico()) {
+            medicoId = contextoSeguranca.getReferenciaId();
+        } else if (contextoSeguranca.isPaciente()) {
+            pacienteId = contextoSeguranca.getReferenciaId();
+        }
+
         List<Agendamento> resultado;
 
         if (medicoId != null && status != null) {
@@ -191,6 +211,7 @@ public class AgendamentoService {
 
     public AgendamentoResponse atualizarStatus(UUID id, StatusAgendamento novoStatus, String localizacaoMedico) {
         var agendamento = buscarOuLancarErro(id);
+        validarAcesso(agendamento);
         StatusAgendamento atual = agendamento.getStatus();
 
         boolean valido = switch (novoStatus) {
@@ -215,6 +236,7 @@ public class AgendamentoService {
 
     public void cancelar(UUID id, CancelarAgendamentoRequest request) {
         var agendamento = buscarOuLancarErro(id);
+        validarAcesso(agendamento);
 
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO) {
             throw new IllegalArgumentException("Agendamento já está cancelado: " + id);
@@ -227,6 +249,16 @@ public class AgendamentoService {
         agendamento.setOrigemCancelamento(request.origemCancelamento());
         agendamento.setMotivoCancelamento(request.motivoCancelamento());
         agendamentoRepository.save(agendamento);
+    }
+
+    private void validarAcesso(Agendamento agendamento) {
+        UUID ref = contextoSeguranca.getReferenciaId();
+        if (contextoSeguranca.isMedico() && !agendamento.getMedicoId().equals(ref)) {
+            throw new AcessoNegadoException("Acesso negado ao agendamento: " + agendamento.getId());
+        }
+        if (contextoSeguranca.isPaciente() && !agendamento.getPacienteId().equals(ref)) {
+            throw new AcessoNegadoException("Acesso negado ao agendamento: " + agendamento.getId());
+        }
     }
 
     private AgendamentoResponse toResponse(Agendamento a) {
