@@ -1,4 +1,4 @@
-# Usar uma imagem base com JDK 21
+# Usar uma imagem base com JDK 2111
 FROM openjdk:21-jdk
 
 # Definir o diretório de trabalho
