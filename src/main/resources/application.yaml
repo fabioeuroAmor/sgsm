@@ -1,6 +1,9 @@
 spring:
   application:
     name: sgsm
+  mvc:
+    problemdetails:
+      enabled: true
 
   datasource:
     hikari:
