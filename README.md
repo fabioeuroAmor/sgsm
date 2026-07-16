@@ -1,6 +1,6 @@
 # SGSM — Sistema de Gerenciamento de Serviços Médicos
 
-Microserviço REST construído com **Spring Boot 4** e **Java 21** para gerenciar médicos, estabelecimentos, pacientes, serviços médicos, agendas e agendamentos — incluindo o fluxo de atendimento domiciliar.
+Microserviço REST construído com **Spring Boot 4** e **Java 21** para gerenciar médicos, estabelecimentos, pacientes, serviços médicos, agendas e agendamentos — incluindo o fluxo de atendimento domiciliar. Faz parte da plataforma SGSM, junto com o [`ms-sboot-auth`](../ms-sboot-auth) (autenticação/autorização) e o [`sgsm-front-medico`](../sgsm-front-medico) (frontend).
 
 ---
 
@@ -17,14 +17,15 @@ Microserviço REST construído com **Spring Boot 4** e **Java 21** para gerencia
 | Gson | 2.13.1 |
 | Jackson Databind | 2.15.2 |
 | SpringDoc OpenAPI (Swagger) | 2.8.6 |
+| JJWT (validação de JWT) | 0.12.6 |
 
 ---
 
 ## Pré-requisitos
 
 - **JDK 21** instalado e no `PATH`
-- **PostgreSQL 18** rodando em `localhost:5432`
-- Banco de dados `postgres` acessível com usuário `postgres` / senha `postgres`
+- **PostgreSQL 18** rodando em `localhost:5432`, schema `sgsm` (`default_schema: sgsm` no `application.yaml`) acessível com usuário `postgres` / senha `postgres`
+- O serviço **`ms-sboot-auth`** rodando em `localhost:8081` — é ele quem emite os tokens JWT que este serviço valida (veja [Autenticação](#autenticação))
 
 ---
 
@@ -40,9 +41,12 @@ spring:
     password: postgres
   jpa:
     show-sql: true
+
+jwt:
+  secret: ${JWT_SECRET:sgsm-chave-desenvolvimento-local-minimo-256-bits-nao-usar-em-producao}
 ```
 
-Altere as credenciais conforme o seu ambiente.
+Altere as credenciais e o `JWT_SECRET` conforme o seu ambiente. **O `jwt.secret` precisa ser idêntico ao configurado no `ms-sboot-auth`** — é o mesmo segredo HS256 usado para assinar (lá) e validar (aqui) o token.
 
 ---
 
@@ -61,7 +65,33 @@ java -jar target/sgsm-0.0.1-SNAPSHOT.jar
 
 A API fica disponível em `http://localhost:8080`.
 
-Documentação interativa (Swagger UI): `http://localhost:8080/swagger-ui.html`
+Documentação interativa (Swagger UI): `http://localhost:8080/swagger-ui/index.html`
+(a rota curta `/swagger-ui.html` **não** está liberada no `SecurityConfig` e retorna 403 — use sempre `/swagger-ui/index.html`)
+
+---
+
+## Autenticação
+
+Este serviço **não emite** tokens — ele só valida os JWTs emitidos pelo `ms-sboot-auth` (mesmo segredo HS256, algoritmo `jjwt`). Fluxo:
+
+1. `POST http://localhost:8081/v1/api/auth/login` no `ms-sboot-auth` com `{"email": "...", "senha": "..."}` → retorna `accessToken`.
+2. Envie esse token em toda chamada a este serviço: `Authorization: Bearer <accessToken>`.
+3. O `JwtAuthFilter` deste serviço lê `perfil`, `referenciaId`, `roles` e `permissions` do token e popula o contexto de segurança (`ContextoSeguranca`) usado pelos Services para isolar dados por médico/paciente/estabelecimento.
+
+### Autorização por rota (`SecurityConfig`)
+
+| Rota | Regra |
+|---|---|
+| `POST /v1/api/medicos`, `POST /v1/api/pacientes` | Público (auto-cadastro, antes de existir login) |
+| `/swagger-ui/**`, `/v3/api-docs/**` | Público |
+| `GET /v1/api/medicos/**` | `MEDICO`, `FUNCIONARIO`, `DESENVOLVEDOR` |
+| `POST /v1/api/medicos/**` | `FUNCIONARIO`, `DESENVOLVEDOR` |
+| `GET /v1/api/pacientes/**` | `PACIENTE`, `MEDICO`, `FUNCIONARIO`, `DESENVOLVEDOR` |
+| `POST/DELETE /v1/api/pacientes/**` | `FUNCIONARIO`, `DESENVOLVEDOR` |
+| `PUT /v1/api/pacientes/**` | `PACIENTE` (dados próprios), `FUNCIONARIO`, `DESENVOLVEDOR` |
+| `/v1/api/agenda/**`, `/v1/api/servicos/**`, `/v1/api/estabelecimentos/**` | `MEDICO`, `FUNCIONARIO`, `DESENVOLVEDOR` |
+| `/v1/api/agendamentos/**` | Qualquer autenticado (segregação fina feita no Service) |
+| Qualquer outra rota | Autenticado |
 
 ---
 
@@ -246,45 +276,32 @@ Todas as respostas de erro seguem o formato:
   "localizacaoMedico": "https://maps.app.goo.gl/..."  // obrigatório para A_CAMINHO
 }
 ```
-## Uso do logging via Logback
+## Testes e qualidade
 
-| Configuração                    | O que será mostrado                     |
-|---------------------------------|-----------------------------------------|
-| `<root level="INFO">`           | INFO, WARN, ERROR                      |
-| `<root level="DEBUG">`          | DEBUG, INFO, WARN, ERROR              |
-| `<root level="WARN">`           | WARN, ERROR                          |
+```bash
+# Rodar a suite de testes
+./mvnw test
 
-## Tipos de tets unitarios a serem implementados
-Tests de camada de Service e de Controller
+# Rodar tests + checks de build (inclui gates de qualidade quando configurados na branch)
+./mvnw verify
+```
 
-## Relatório de Cobertura de Testes com jacoco
-Após executar os testes, o relatório de cobertura está disponível em:
+Tipos de teste da camada de Service e Controller (JUnit 5 + Mockito), sem subir o contexto Spring completo (`@SpringBootTest`) — mantém a suíte rápida.
 
-## plaintext
-sboot-atomico-rag/target/site/jacoco/index.html
+> Cobertura de testes (Jacoco) e verificação de vulnerabilidades de dependências (OWASP `dependency-check-maven`) são mantidas em branches de feature dedicadas deste repositório — confira o histórico de branches/PRs para o estado mais atual dessas ferramentas antes de assumir que estão ativas na branch em que você está.
 
-## Relatório de Cobertura de Verificação de Vunerabilidades de libs com Maven OWASP Dependency-Check
-sboot-atomico-rag/target/dependency-check-report.html
+### Verificar árvore de dependências
 
-## Banco de dados do OWASP Dependency-Check
-https://raw.githubusercontent.com/Retirejs/retire.js/master/repository/jsrepository.json
+```bash
+./mvnw dependency:tree -DoutputFile=dependencias.txt -Dverbose
+```
 
-## Verificar hierarquias de dependencias do projeto. Executar o comando abaixo no gitbash
-mvn dependency:tree -DoutputFile=dependencias.txt -Dverbose
-
-## Como Rodar o Projeto
-## Antes de rodar os comandos docker. Dei o (sudo su) no Linux e digite sua senha de administrador
-sudo su
-## Construir a imagem Docker: No terminal, na pasta do seu projeto, execute:
-docker build -t minha-microservice .
-
-## Rodar sua aplicação em um container:
-docker run -p 8080:8080 minha-microservice
-
-### Você rodar sua aplicação, chamando a classe main() de seu projeto via IDE e em modo debug.
+---
 
 ### Clonar o repositório
 
 ```bash
-git clone https://XXXXXXXXXXXX
-cd nome-do-repo
+git clone <url-do-repositorio>
+cd sgsm
+./mvnw spring-boot:run
+```
