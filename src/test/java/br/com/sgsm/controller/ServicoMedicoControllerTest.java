@@ -1,0 +1,94 @@
+package br.com.sgsm.controller;
+
+import br.com.sgsm.dto.AtualizarServicoMedicoRequest;
+import br.com.sgsm.dto.CadastrarServicoMedicoRequest;
+import br.com.sgsm.dto.ServicoMedicoResponse;
+import br.com.sgsm.service.ServicoMedicoService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class ServicoMedicoControllerTest {
+
+    @Mock
+    private ServicoMedicoService service;
+
+    private ServicoMedicoController controller;
+
+    @BeforeEach
+    void setUp() {
+        controller = new ServicoMedicoController(service);
+    }
+
+    @Test
+    void deveRetornar201AoCadastrar() {
+        var request = new CadastrarServicoMedicoRequest(
+                UUID.randomUUID(), "Consulta", null, new BigDecimal("100.00"), 30, false, null);
+        var resposta = new ServicoMedicoResponse();
+        when(service.cadastrar(request)).thenReturn(resposta);
+
+        var response = controller.cadastrar(request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isEqualTo(resposta);
+    }
+
+    @Test
+    void deveRetornar200AoConsultar() {
+        UUID id = UUID.randomUUID();
+        var resposta = new ServicoMedicoResponse();
+        when(service.consultar(id)).thenReturn(resposta);
+
+        var response = controller.consultar(id);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(resposta);
+    }
+
+    @Test
+    void deveRetornar200AoAtualizar() {
+        UUID id = UUID.randomUUID();
+        var request = new AtualizarServicoMedicoRequest("Consulta premium", null, null, null, null, null);
+        var resposta = new ServicoMedicoResponse();
+        when(service.atualizar(id, request)).thenReturn(resposta);
+
+        var response = controller.atualizar(id, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(resposta);
+    }
+
+    @Test
+    void deveRetornar204AoRemover() {
+        UUID id = UUID.randomUUID();
+
+        var response = controller.remover(id);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verify(service).remover(id);
+    }
+
+    @Test
+    void deveRetornar200ComListaAoListar() {
+        UUID medicoId = UUID.randomUUID();
+        var resposta = new ServicoMedicoResponse();
+        when(service.listar(true, medicoId)).thenReturn(List.of(resposta));
+
+        var response = controller.listar(true, medicoId);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsExactly(resposta);
+    }
+}
