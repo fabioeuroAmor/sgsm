@@ -53,6 +53,8 @@ public class SecurityConfig {
                 .requestMatchers("/v1/api/agenda/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers("/v1/api/servicos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers("/v1/api/estabelecimentos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                // Funcionarios: MEDICO gerencia apenas funcionarios dos seus estabelecimentos
+                .requestMatchers("/v1/api/funcionarios/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

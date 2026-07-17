@@ -218,6 +218,37 @@ class EstabelecimentoServiceTest {
     }
 
     @Test
+    void deveListarEstabelecimentosVinculadosQuandoMedicoIdInformado() {
+        UUID medicoId = UUID.randomUUID();
+        UUID estabelecimentoId = UUID.randomUUID();
+        var vinculo = new MedicoEstabelecimento(medicoId, estabelecimentoId);
+        var est = novoEstabelecimento();
+        when(medicoEstabelecimentoRepository.findById_MedicoIdAndAtivo(medicoId, true))
+                .thenReturn(List.of(vinculo));
+        when(repository.findAllById(List.of(estabelecimentoId))).thenReturn(List.of(est));
+
+        var resultado = service.listar(null, null, null, medicoId);
+
+        assertThat(resultado).hasSize(1);
+        verify(medicoEstabelecimentoRepository).findById_MedicoIdAndAtivo(medicoId, true);
+    }
+
+    @Test
+    void deveListarEstabelecimentosVinculadosAtivosQuandoMedicoIdEAtivoInformados() {
+        UUID medicoId = UUID.randomUUID();
+        UUID estabelecimentoId = UUID.randomUUID();
+        var vinculo = new MedicoEstabelecimento(medicoId, estabelecimentoId);
+        var est = novoEstabelecimento();
+        when(medicoEstabelecimentoRepository.findById_MedicoIdAndAtivo(medicoId, true))
+                .thenReturn(List.of(vinculo));
+        when(repository.findAllById(List.of(estabelecimentoId))).thenReturn(List.of(est));
+
+        var resultado = service.listar(true, null, null, medicoId);
+
+        assertThat(resultado).hasSize(1);
+    }
+
+    @Test
     void deveListarMedicosVinculadosAtivos() {
         UUID estabelecimentoId = UUID.randomUUID();
         UUID medicoId = UUID.randomUUID();

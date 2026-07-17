@@ -51,8 +51,9 @@ public class EstabelecimentoController {
     public ResponseEntity<List<EstabelecimentoResponse>> listar(
             @RequestParam(required = false) Boolean ativo,
             @RequestParam(required = false) String uf,
-            @RequestParam(required = false) String cidade) {
-        return ResponseEntity.ok(service.listar(ativo, uf, cidade));
+            @RequestParam(required = false) String cidade,
+            @RequestParam(required = false) UUID medicoId) {
+        return ResponseEntity.ok(service.listar(ativo, uf, cidade, medicoId));
     }
 
     // UC - Listar médicos vinculados ao estabelecimento

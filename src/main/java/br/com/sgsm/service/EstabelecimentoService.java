@@ -71,9 +71,25 @@ public class EstabelecimentoService {
 
     @Transactional(readOnly = true)
     public List<EstabelecimentoResponse> listar(Boolean ativo, String uf, String cidade) {
+        return listar(ativo, uf, cidade, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EstabelecimentoResponse> listar(Boolean ativo, String uf, String cidade, UUID medicoId) {
         List<Estabelecimento> resultado;
 
-        if (uf != null && ativo != null) {
+        if (medicoId != null) {
+            List<UUID> ids = medicoEstabelecimentoRepository
+                    .findById_MedicoIdAndAtivo(medicoId, true)
+                    .stream()
+                    .map(me -> me.getId().getEstabelecimentoId())
+                    .toList();
+            resultado = (List<Estabelecimento>) repository.findAllById(ids);
+            if (ativo != null) {
+                final Boolean filtroAtivo = ativo;
+                resultado = resultado.stream().filter(e -> filtroAtivo.equals(e.getAtivo())).toList();
+            }
+        } else if (uf != null && ativo != null) {
             resultado = repository.findAllByUfAndAtivo(uf.toUpperCase(), ativo);
         } else if (cidade != null && ativo != null) {
             resultado = repository.findAllByCidadeAndAtivo(cidade, ativo);
