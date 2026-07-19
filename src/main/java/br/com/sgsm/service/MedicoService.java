@@ -4,6 +4,7 @@ import br.com.sgsm.domain.Medico;
 import br.com.sgsm.dto.AtualizarMedicoRequest;
 import br.com.sgsm.dto.CadastrarMedicoRequest;
 import br.com.sgsm.dto.MedicoResponse;
+import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.MedicoRepository;
@@ -22,11 +23,14 @@ public class MedicoService {
     private final MedicoRepository repository;
     private final ModelMapper modelMapper;
     private final ContextoSeguranca contextoSeguranca;
+    private final VetorizacaoPublisher vetorizacaoPublisher;
 
-    public MedicoService(MedicoRepository repository, ModelMapper modelMapper, ContextoSeguranca contextoSeguranca) {
+    public MedicoService(MedicoRepository repository, ModelMapper modelMapper,
+                         ContextoSeguranca contextoSeguranca, VetorizacaoPublisher vetorizacaoPublisher) {
         this.repository = repository;
         this.modelMapper = modelMapper;
         this.contextoSeguranca = contextoSeguranca;
+        this.vetorizacaoPublisher = vetorizacaoPublisher;
     }
 
     public MedicoResponse cadastrar(CadastrarMedicoRequest request) {
@@ -40,8 +44,9 @@ public class MedicoService {
 
         var medico = modelMapper.map(request, Medico.class);
         medico.setCrmUf(medico.getCrmUf().toUpperCase());
-
-        return modelMapper.map(repository.save(medico), MedicoResponse.class);
+        var salvo = repository.save(medico);
+        vetorizacaoPublisher.publicar("MEDICO", salvo.getId().toString(), "CREATE");
+        return modelMapper.map(salvo, MedicoResponse.class);
     }
 
     @Transactional(readOnly = true)
@@ -67,8 +72,9 @@ public class MedicoService {
         }
 
         modelMapper.map(request, medico);
-
-        return modelMapper.map(repository.save(medico), MedicoResponse.class);
+        var salvo = repository.save(medico);
+        vetorizacaoPublisher.publicar("MEDICO", salvo.getId().toString(), "UPDATE");
+        return modelMapper.map(salvo, MedicoResponse.class);
     }
 
     public void remover(UUID id) {

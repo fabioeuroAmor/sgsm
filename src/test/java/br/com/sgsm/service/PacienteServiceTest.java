@@ -8,7 +8,9 @@ import br.com.sgsm.dto.CadastrarPacienteRequest;
 import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.AgendamentoRepository;
+import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.repository.PacienteRepository;
+import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.security.ContextoSeguranca;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,13 +37,15 @@ class PacienteServiceTest {
     private AgendamentoRepository agendamentoRepository;
     @Mock
     private ContextoSeguranca contextoSeguranca;
+    @Mock
+    private VetorizacaoPublisher vetorizacaoPublisher;
 
     private PacienteService service;
 
     @BeforeEach
     void setUp() {
         service = new PacienteService(repository, agendamentoRepository,
-                new ModelMapperConfig().modelMapper(), contextoSeguranca);
+                new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher);
     }
 
     private Paciente novoPaciente() {
@@ -62,7 +66,11 @@ class PacienteServiceTest {
 
     @Test
     void deveCadastrarPacienteQuandoCpfEEmailInexistentes() {
-        when(repository.save(any(Paciente.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.save(any(Paciente.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
         var request = new CadastrarPacienteRequest("João Silva", "12345678900",
                 LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
 
@@ -162,7 +170,11 @@ class PacienteServiceTest {
         UUID id = UUID.randomUUID();
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         when(repository.findById(id)).thenReturn(Optional.of(novoPaciente()));
-        when(repository.save(any(Paciente.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.save(any(Paciente.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
         var request = new AtualizarPacienteRequest("João S. Silva", null, null, null, null, null, null, null, null, null, null);
 
         var response = service.atualizar(id, request);

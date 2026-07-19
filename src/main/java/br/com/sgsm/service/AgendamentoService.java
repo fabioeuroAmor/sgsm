@@ -2,6 +2,7 @@ package br.com.sgsm.service;
 
 import br.com.sgsm.domain.*;
 import br.com.sgsm.dto.*;
+import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.*;
@@ -33,6 +34,7 @@ public class AgendamentoService {
     private final PacienteRepository pacienteRepository;
     private final ModelMapper modelMapper;
     private final ContextoSeguranca contextoSeguranca;
+    private final VetorizacaoPublisher vetorizacaoPublisher;
 
     public AgendamentoService(
             AgendamentoRepository agendamentoRepository,
@@ -44,7 +46,8 @@ public class AgendamentoService {
             EstabelecimentoRepository estabelecimentoRepository,
             PacienteRepository pacienteRepository,
             ModelMapper modelMapper,
-            ContextoSeguranca contextoSeguranca) {
+            ContextoSeguranca contextoSeguranca,
+            VetorizacaoPublisher vetorizacaoPublisher) {
         this.agendamentoRepository = agendamentoRepository;
         this.agendaMedicoRepository = agendaMedicoRepository;
         this.bloqueioAgendaRepository = bloqueioAgendaRepository;
@@ -55,6 +58,7 @@ public class AgendamentoService {
         this.pacienteRepository = pacienteRepository;
         this.modelMapper = modelMapper;
         this.contextoSeguranca = contextoSeguranca;
+        this.vetorizacaoPublisher = vetorizacaoPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -172,7 +176,9 @@ public class AgendamentoService {
         agendamento.setDataHoraFim(dataHoraFim);
         agendamento.setObservacoes(request.observacoes());
 
-        return toResponse(agendamentoRepository.save(agendamento));
+        var salvo = agendamentoRepository.save(agendamento);
+        vetorizacaoPublisher.publicar("AGENDAMENTO", salvo.getId().toString(), "CREATE");
+        return toResponse(salvo);
     }
 
     @Transactional(readOnly = true)
@@ -231,7 +237,9 @@ public class AgendamentoService {
         if (novoStatus == StatusAgendamento.A_CAMINHO && localizacaoMedico != null && !localizacaoMedico.isBlank()) {
             agendamento.setLocalizacaoMedico(localizacaoMedico);
         }
-        return toResponse(agendamentoRepository.save(agendamento));
+        var salvo = agendamentoRepository.save(agendamento);
+        vetorizacaoPublisher.publicar("AGENDAMENTO", salvo.getId().toString(), "UPDATE");
+        return toResponse(salvo);
     }
 
     public void cancelar(UUID id, CancelarAgendamentoRequest request) {
