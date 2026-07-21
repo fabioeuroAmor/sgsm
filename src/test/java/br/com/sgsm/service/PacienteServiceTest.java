@@ -253,15 +253,9 @@ class PacienteServiceTest {
     }
 
     @Test
-    void deveListarPacientesDoMedicoFiltrandoPorAtivo() {
-        UUID medicoId = UUID.randomUUID();
-        UUID pacienteId = UUID.randomUUID();
+    void deveListarPacientesAtivosQuandoMedicoLogado() {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
-        when(contextoSeguranca.isMedico()).thenReturn(true);
-        when(contextoSeguranca.getReferenciaId()).thenReturn(medicoId);
-        when(agendamentoRepository.findAllByMedicoId(medicoId)).thenReturn(List.of(novoAgendamento(pacienteId)));
-        var pacienteAtivo = novoPaciente();
-        when(repository.findAllById(List.of(pacienteId))).thenReturn(List.of(pacienteAtivo));
+        when(repository.findAllByAtivo(true)).thenReturn(List.of(novoPaciente()));
 
         var resultado = service.listar(true);
 
@@ -269,14 +263,9 @@ class PacienteServiceTest {
     }
 
     @Test
-    void deveListarPacientesDoMedicoSemFiltroDeAtivo() {
-        UUID medicoId = UUID.randomUUID();
-        UUID pacienteId = UUID.randomUUID();
+    void deveListarTodosPacientesQuandoMedicoLogadoSemFiltroDeAtivo() {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
-        when(contextoSeguranca.isMedico()).thenReturn(true);
-        when(contextoSeguranca.getReferenciaId()).thenReturn(medicoId);
-        when(agendamentoRepository.findAllByMedicoId(medicoId)).thenReturn(List.of(novoAgendamento(pacienteId)));
-        when(repository.findAllById(List.of(pacienteId))).thenReturn(List.of(novoPaciente()));
+        when(repository.findAll()).thenReturn(List.of(novoPaciente()));
 
         var resultado = service.listar(null);
 
@@ -286,7 +275,6 @@ class PacienteServiceTest {
     @Test
     void deveListarPacientesPorAtivoQuandoNemMedicoNemPaciente() {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
-        when(contextoSeguranca.isMedico()).thenReturn(false);
         when(repository.findAllByAtivo(true)).thenReturn(List.of(novoPaciente()));
 
         var resultado = service.listar(true);
@@ -297,7 +285,6 @@ class PacienteServiceTest {
     @Test
     void deveListarTodosPacientesQuandoNenhumFiltroInformado() {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
-        when(contextoSeguranca.isMedico()).thenReturn(false);
         when(repository.findAll()).thenReturn(List.of(novoPaciente()));
 
         var resultado = service.listar(null);

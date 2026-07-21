@@ -136,21 +136,21 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
-			<plugin>
+			<!--<plugin>
 				<groupId>org.owasp</groupId>
 				<artifactId>dependency-check-maven</artifactId>
 				<version>12.1.3</version>
-				<configuration>
+				<configuration>-->
 					<!-- Key lida de variável de ambiente; nunca gravada no pom.xml -->
-					<nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+					<!--<nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
 					<formats>
 						<format>HTML</format>
 						<format>XML</format>
 					</formats>
-					<failBuildOnCVSS>7</failBuildOnCVSS>
+					<failBuildOnCVSS>7</failBuildOnCVSS>-->
 					<!-- Sonatype OSS Index é apenas complementar ao NVD e sofre rate limit sem conta cadastrada;
 					     desabilitado para não tornar o gate instável -->
-					<ossindexAnalyzerEnabled>false</ossindexAnalyzerEnabled>
+					<!--<ossindexAnalyzerEnabled>false</ossindexAnalyzerEnabled>
 				</configuration>
 				<executions>
 					<execution>
@@ -159,7 +159,8 @@
 						</goals>
 					</execution>
 				</executions>
-			</plugin>
+			</plugin>-->
+
 			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>

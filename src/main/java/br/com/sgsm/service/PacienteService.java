@@ -108,16 +108,6 @@ public class PacienteService {
                     .map(p -> List.of(modelMapper.map(p, PacienteResponse.class)))
                     .orElse(List.of());
         }
-        if (contextoSeguranca.isMedico()) {
-            UUID medicoId = contextoSeguranca.getReferenciaId();
-            List<UUID> pacienteIds = agendamentoRepository.findAllByMedicoId(medicoId)
-                    .stream().map(Agendamento::getPacienteId).distinct().toList();
-            List<Paciente> resultado = repository.findAllById(pacienteIds);
-            if (ativo != null) {
-                resultado = resultado.stream().filter(p -> ativo.equals(p.getAtivo())).toList();
-            }
-            return resultado.stream().map(p -> modelMapper.map(p, PacienteResponse.class)).toList();
-        }
         List<Paciente> resultado = (ativo != null)
                 ? repository.findAllByAtivo(ativo)
                 : repository.findAll();
