@@ -180,7 +180,9 @@ public class AgendamentoService {
         agendamento.setDataHoraFim(dataHoraFim);
         agendamento.setObservacoes(request.observacoes());
 
-        return toResponse(agendamentoRepository.save(agendamento));
+        var salvo = agendamentoRepository.save(agendamento);
+        vetorizacaoPublisher.publicar("AGENDAMENTO", salvo.getId().toString(), "CREATE");
+        return toResponse(salvo);
     }
 
     @Transactional(readOnly = true)

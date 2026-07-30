@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
@@ -26,6 +27,8 @@ class JwtAuthFilterTest {
     @Mock
     private JwtService jwtService;
     @Mock
+    private StringRedisTemplate redis;
+    @Mock
     private HttpServletRequest request;
     @Mock
     private HttpServletResponse response;
@@ -42,7 +45,7 @@ class JwtAuthFilterTest {
     }
 
     private JwtAuthFilter criarFiltro() {
-        return new JwtAuthFilter(jwtService);
+        return new JwtAuthFilter(jwtService, redis);
     }
 
     @Test

@@ -8,6 +8,7 @@ import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.events.NotificacaoPublisher;
 import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.repository.*;
+import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.security.ContextoSeguranca;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -292,7 +293,11 @@ class AgendamentoServiceTest {
         when(servicoMedicoRepository.findById(servicoId)).thenReturn(Optional.of(servico));
         when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(novoPaciente()));
         when(estabelecimentoRepository.findById(estabelecimentoId)).thenReturn(Optional.of(novoEstabelecimento(true)));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var request = new CadastrarAgendamentoRequest(pacienteId, servicoId, estabelecimentoId,
                 TipoAgendamento.PRESENCIAL, OffsetDateTime.now(), "obs");
@@ -311,7 +316,11 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         when(servicoMedicoRepository.findById(servicoId)).thenReturn(Optional.of(novoServico(medicoId, true)));
         when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(novoPaciente()));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var request = new CadastrarAgendamentoRequest(pacienteId, servicoId, null, null, OffsetDateTime.now(), null);
 
@@ -328,7 +337,11 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         when(servicoMedicoRepository.findById(servicoId)).thenReturn(Optional.of(novoServico(medicoId, true)));
         when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(novoPaciente()));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var request = new CadastrarAgendamentoRequest(pacienteId, servicoId, null,
                 TipoAgendamento.DOMICILIAR, OffsetDateTime.now(), null);
@@ -350,7 +363,11 @@ class AgendamentoServiceTest {
         servico.setDuracaoMinutos(null);
         when(servicoMedicoRepository.findById(servicoId)).thenReturn(Optional.of(servico));
         when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(novoPaciente()));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
         OffsetDateTime inicio = OffsetDateTime.now();
 
         var request = new CadastrarAgendamentoRequest(pacienteId, servicoId, null,
@@ -384,7 +401,11 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.getReferenciaId()).thenReturn(pacienteId);
         when(servicoMedicoRepository.findById(servicoId)).thenReturn(Optional.of(novoServico(medicoId, true)));
         when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(novoPaciente()));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var request = new CadastrarAgendamentoRequest(pacienteId, servicoId, null,
                 TipoAgendamento.DOMICILIAR, OffsetDateTime.now(), null);
@@ -594,7 +615,11 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         var agendamento = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.PRESENCIAL);
         when(agendamentoRepository.findById(id)).thenReturn(Optional.of(agendamento));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var response = service.atualizarStatus(id, StatusAgendamento.CONFIRMADO, null);
 
@@ -610,7 +635,11 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         var agendamento = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.AGUARDANDO_PAGAMENTO, TipoAgendamento.PRESENCIAL);
         when(agendamentoRepository.findById(id)).thenReturn(Optional.of(agendamento));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var response = service.atualizarStatus(id, StatusAgendamento.CONFIRMADO, null);
 
@@ -644,7 +673,11 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         var agendamento = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.CONFIRMADO, TipoAgendamento.DOMICILIAR);
         when(agendamentoRepository.findById(id)).thenReturn(Optional.of(agendamento));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var response = service.atualizarStatus(id, StatusAgendamento.A_CAMINHO, "-23.55,-46.63");
 
@@ -660,7 +693,11 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         var agendamento = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.CONFIRMADO, TipoAgendamento.DOMICILIAR);
         when(agendamentoRepository.findById(id)).thenReturn(Optional.of(agendamento));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var response = service.atualizarStatus(id, StatusAgendamento.A_CAMINHO, "   ");
 
@@ -689,7 +726,11 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         var agendamento = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.A_CAMINHO, TipoAgendamento.DOMICILIAR);
         when(agendamentoRepository.findById(id)).thenReturn(Optional.of(agendamento));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var response = service.atualizarStatus(id, StatusAgendamento.CHEGOU, null);
 
@@ -704,7 +745,11 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         var agendamento = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.CONFIRMADO, TipoAgendamento.PRESENCIAL);
         when(agendamentoRepository.findById(id)).thenReturn(Optional.of(agendamento));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var response = service.atualizarStatus(id, StatusAgendamento.EM_ANDAMENTO, null);
 
@@ -719,7 +764,11 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         var agendamento = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.CHEGOU, TipoAgendamento.DOMICILIAR);
         when(agendamentoRepository.findById(id)).thenReturn(Optional.of(agendamento));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var response = service.atualizarStatus(id, StatusAgendamento.EM_ANDAMENTO, null);
 
@@ -734,7 +783,11 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         var agendamento = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.EM_ANDAMENTO, TipoAgendamento.PRESENCIAL);
         when(agendamentoRepository.findById(id)).thenReturn(Optional.of(agendamento));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var response = service.atualizarStatus(id, StatusAgendamento.CONCLUIDO, null);
 

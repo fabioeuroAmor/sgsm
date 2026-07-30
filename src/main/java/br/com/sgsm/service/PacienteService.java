@@ -5,6 +5,7 @@ import br.com.sgsm.domain.Paciente;
 import br.com.sgsm.dto.AtualizarPacienteRequest;
 import br.com.sgsm.dto.CadastrarPacienteRequest;
 import br.com.sgsm.dto.PacienteResponse;
+import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.AgendamentoRepository;
@@ -25,15 +26,18 @@ public class PacienteService {
     private final AgendamentoRepository agendamentoRepository;
     private final ModelMapper modelMapper;
     private final ContextoSeguranca contextoSeguranca;
+    private final VetorizacaoPublisher vetorizacaoPublisher;
 
     public PacienteService(PacienteRepository repository,
                            AgendamentoRepository agendamentoRepository,
                            ModelMapper modelMapper,
-                           ContextoSeguranca contextoSeguranca) {
+                           ContextoSeguranca contextoSeguranca,
+                           VetorizacaoPublisher vetorizacaoPublisher) {
         this.repository = repository;
         this.agendamentoRepository = agendamentoRepository;
         this.modelMapper = modelMapper;
         this.contextoSeguranca = contextoSeguranca;
+        this.vetorizacaoPublisher = vetorizacaoPublisher;
     }
 
     // UC - Cadastrar paciente
@@ -46,8 +50,9 @@ public class PacienteService {
         }
 
         var paciente = modelMapper.map(request, Paciente.class);
-
-        return modelMapper.map(repository.save(paciente), PacienteResponse.class);
+        var salvo = repository.save(paciente);
+        vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "CREATE");
+        return modelMapper.map(salvo, PacienteResponse.class);
     }
 
     // UC - Consultar paciente
@@ -82,8 +87,9 @@ public class PacienteService {
         }
 
         modelMapper.map(request, paciente);
-
-        return modelMapper.map(repository.save(paciente), PacienteResponse.class);
+        var salvo = repository.save(paciente);
+        vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
+        return modelMapper.map(salvo, PacienteResponse.class);
     }
 
     // UC - Remover (inativar) paciente
@@ -101,16 +107,6 @@ public class PacienteService {
             return repository.findById(id)
                     .map(p -> List.of(modelMapper.map(p, PacienteResponse.class)))
                     .orElse(List.of());
-        }
-        if (contextoSeguranca.isMedico()) {
-            UUID medicoId = contextoSeguranca.getReferenciaId();
-            List<UUID> pacienteIds = agendamentoRepository.findAllByMedicoId(medicoId)
-                    .stream().map(Agendamento::getPacienteId).distinct().toList();
-            List<Paciente> resultado = repository.findAllById(pacienteIds);
-            if (ativo != null) {
-                resultado = resultado.stream().filter(p -> ativo.equals(p.getAtivo())).toList();
-            }
-            return resultado.stream().map(p -> modelMapper.map(p, PacienteResponse.class)).toList();
         }
         List<Paciente> resultado = (ativo != null)
                 ? repository.findAllByAtivo(ativo)

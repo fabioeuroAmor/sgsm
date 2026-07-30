@@ -3,7 +3,9 @@ package br.com.sgsm.service;
 import br.com.sgsm.domain.ServicoMedico;
 import br.com.sgsm.dto.AtualizarServicoMedicoRequest;
 import br.com.sgsm.dto.CadastrarServicoMedicoRequest;
+import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
+import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.repository.ServicoMedicoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,12 +28,14 @@ class ServicoMedicoServiceTest {
 
     @Mock
     private ServicoMedicoRepository repository;
+    @Mock
+    private VetorizacaoPublisher vetorizacaoPublisher;
 
     private ServicoMedicoService service;
 
     @BeforeEach
     void setUp() {
-        service = new ServicoMedicoService(repository, new br.com.sgsm.config.ModelMapperConfig().modelMapper());
+        service = new ServicoMedicoService(repository, new br.com.sgsm.config.ModelMapperConfig().modelMapper(), vetorizacaoPublisher);
     }
 
     private ServicoMedico novoServico() {
@@ -50,7 +54,11 @@ class ServicoMedicoServiceTest {
         var request = new CadastrarServicoMedicoRequest(
                 UUID.randomUUID(), "Consulta cardiológica", "Avaliação clínica",
                 new BigDecimal("250.00"), 30, false, null);
-        when(repository.save(any(ServicoMedico.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.save(any(ServicoMedico.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var response = service.cadastrar(request);
 
@@ -85,7 +93,11 @@ class ServicoMedicoServiceTest {
         var servico = novoServico();
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.of(servico));
-        when(repository.save(any(ServicoMedico.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.save(any(ServicoMedico.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
         var request = new AtualizarServicoMedicoRequest(
                 "Consulta cardiológica premium", null, new BigDecimal("300.00"), null, null, null);
 
