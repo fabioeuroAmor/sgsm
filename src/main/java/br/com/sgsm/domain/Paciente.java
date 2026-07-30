@@ -52,6 +52,12 @@ public class Paciente {
     @Column(nullable = false)
     private Boolean ativo;
 
+    // Opt-out de notificacoes proativas via WhatsApp (confirmacao de agendamento, lembrete,
+    // recuperacao de inativos) — ver secao 10.2 do desenho de solucao. Paciente que pedir para
+    // parar nao recebe mais nenhuma delas.
+    @Column(name = "whatsapp_opt_out", nullable = false)
+    private Boolean whatsappOptOut;
+
     @Column(name = "criado_em", nullable = false, updatable = false)
     private OffsetDateTime criadoEm;
 
@@ -63,6 +69,7 @@ public class Paciente {
     @PrePersist
     void prePersist() {
         this.ativo = true;
+        if (this.whatsappOptOut == null) this.whatsappOptOut = false;
         this.criadoEm = OffsetDateTime.now();
         this.atualizadoEm = OffsetDateTime.now();
     }
@@ -86,6 +93,7 @@ public class Paciente {
     public String getUf() { return uf; }
     public String getCep() { return cep; }
     public Boolean getAtivo() { return ativo; }
+    public Boolean getWhatsappOptOut() { return whatsappOptOut; }
     public OffsetDateTime getCriadoEm() { return criadoEm; }
     public OffsetDateTime getAtualizadoEm() { return atualizadoEm; }
 
@@ -102,4 +110,5 @@ public class Paciente {
     public void setUf(String uf) { this.uf = uf; }
     public void setCep(String cep) { this.cep = cep; }
     public void setAtivo(Boolean ativo) { this.ativo = ativo; }
+    public void setWhatsappOptOut(Boolean whatsappOptOut) { this.whatsappOptOut = whatsappOptOut; }
 }

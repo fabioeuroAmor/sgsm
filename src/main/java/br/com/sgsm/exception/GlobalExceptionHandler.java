@@ -28,6 +28,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "argumento-invalido", "Requisição inválida", ex.getMessage(), request);
     }
 
+    @ExceptionHandler(IntegracaoException.class)
+    public ResponseEntity<ProblemDetail> handleIntegracao(IntegracaoException ex, HttpServletRequest request) {
+        return problem(ex.getStatus(), "erro-integracao", "Falha de integração externa", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleErroInterno(Exception ex, HttpServletRequest request) {
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "erro-interno", "Erro interno",

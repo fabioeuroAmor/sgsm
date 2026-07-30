@@ -22,3 +22,15 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET:sgsm-chave-desenvolvimento-local-minimo-256-bits-nao-usar-em-producao}
+
+ia:
+  base-url: ${IA_BASE_URL:http://localhost:8082}
+
+evolution:
+  api:
+    url: ${EVOLUTION_API_URL:http://localhost:8084}
+    key: ${EVOLUTION_API_KEY:}
+    instance: ${EVOLUTION_INSTANCE:sgsm}
+
+whatsapp:
+  webhook-token: ${WHATSAPP_WEBHOOK_TOKEN:}

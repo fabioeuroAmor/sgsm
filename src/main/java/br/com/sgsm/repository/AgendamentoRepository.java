@@ -21,6 +21,9 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
 
     List<Agendamento> findAllByPacienteIdAndStatus(UUID pacienteId, StatusAgendamento status);
 
+    List<Agendamento> findAllByStatusAndDataHoraInicioBetween(
+            StatusAgendamento status, OffsetDateTime inicio, OffsetDateTime fim);
+
     List<Agendamento> findAllByMedicoIdAndStatus(UUID medicoId, StatusAgendamento status);
 
     @Query("SELECT a FROM Agendamento a " +

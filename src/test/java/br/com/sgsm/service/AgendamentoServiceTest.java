@@ -5,6 +5,8 @@ import br.com.sgsm.domain.*;
 import br.com.sgsm.dto.*;
 import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
+import br.com.sgsm.events.NotificacaoPublisher;
+import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.repository.*;
 import br.com.sgsm.security.ContextoSeguranca;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +52,10 @@ class AgendamentoServiceTest {
     private PacienteRepository pacienteRepository;
     @Mock
     private ContextoSeguranca contextoSeguranca;
+    @Mock
+    private VetorizacaoPublisher vetorizacaoPublisher;
+    @Mock
+    private NotificacaoPublisher notificacaoPublisher;
 
     private AgendamentoService service;
 
@@ -59,7 +65,8 @@ class AgendamentoServiceTest {
                 agendamentoRepository, agendaMedicoRepository, bloqueioAgendaRepository,
                 medicoEstabelecimentoRepository, servicoMedicoRepository, medicoRepository,
                 estabelecimentoRepository, pacienteRepository,
-                new ModelMapperConfig().modelMapper(), contextoSeguranca);
+                new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher,
+                notificacaoPublisher);
     }
 
     // ---------- Fixtures ----------
@@ -592,6 +599,7 @@ class AgendamentoServiceTest {
         var response = service.atualizarStatus(id, StatusAgendamento.CONFIRMADO, null);
 
         assertThat(response.getStatus()).isEqualTo(StatusAgendamento.CONFIRMADO);
+        verify(notificacaoPublisher).publicar(eq("CONFIRMACAO_AGENDAMENTO"), anyString(), eq(agendamento.getPacienteId().toString()));
     }
 
     @Test
@@ -607,6 +615,25 @@ class AgendamentoServiceTest {
         var response = service.atualizarStatus(id, StatusAgendamento.CONFIRMADO, null);
 
         assertThat(response.getStatus()).isEqualTo(StatusAgendamento.CONFIRMADO);
+    }
+
+    @Test
+    void naoDevePublicarNotificacaoAoMarcarComoEmAndamento() {
+        UUID id = UUID.randomUUID();
+        UUID medicoId = UUID.randomUUID();
+        when(contextoSeguranca.isMedico()).thenReturn(false);
+        when(contextoSeguranca.isPaciente()).thenReturn(false);
+        var agendamento = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.CONFIRMADO, TipoAgendamento.PRESENCIAL);
+        when(agendamentoRepository.findById(id)).thenReturn(Optional.of(agendamento));
+        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
+
+        service.atualizarStatus(id, StatusAgendamento.EM_ANDAMENTO, null);
+
+        verifyNoInteractions(notificacaoPublisher);
     }
 
     @Test

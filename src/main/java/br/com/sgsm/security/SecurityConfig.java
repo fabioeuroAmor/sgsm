@@ -31,6 +31,9 @@ public class SecurityConfig {
                 // Auto-cadastro publico: novo medico/paciente cria seu perfil antes de autenticar
                 .requestMatchers(HttpMethod.POST, "/v1/api/medicos").permitAll()
                 .requestMatchers(HttpMethod.POST, "/v1/api/pacientes").permitAll()
+                // Webhook do canal WhatsApp: nao ha JWT nesse canal, protegido por token
+                // proprio no header (ver WhatsAppWebhookController) — sem token valido: 401
+                .requestMatchers(HttpMethod.POST, "/v1/api/whatsapp/webhook").permitAll()
                 // Medicos: MEDICO so ve a si mesmo; FUNCIONARIO e DESENVOLVEDOR veem todos
                 .requestMatchers(HttpMethod.GET, "/v1/api/medicos/**")
                     .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")

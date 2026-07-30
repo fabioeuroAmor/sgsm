@@ -77,4 +77,29 @@ class JwtServiceTest {
     void tokenValidoDeveRetornarFalseParaTokenMalFormado() {
         assertThat(jwtService.tokenValido("token-invalido-nao-jwt")).isFalse();
     }
+
+    @Test
+    void gerarTokenServicoDeveCarregarPerfilEReferenciaId() {
+        String pacienteId = UUID.randomUUID().toString();
+
+        String token = jwtService.gerarTokenServico(pacienteId, "PACIENTE", "paciente@sgsm.com.br");
+        Claims claims = jwtService.extrairClaims(token);
+
+        assertThat(claims.getSubject()).isEqualTo(pacienteId);
+        assertThat(claims.get("perfil")).isEqualTo("PACIENTE");
+        assertThat(claims.get("referenciaId")).isEqualTo(pacienteId);
+        assertThat(claims.get("email")).isEqualTo("paciente@sgsm.com.br");
+        assertThat(claims.get("roles", java.util.List.class)).containsExactly("PACIENTE");
+        assertThat(jwtService.tokenValido(token)).isTrue();
+    }
+
+    @Test
+    void gerarTokenServicoDeveExpirarEmPoucoTempo() {
+        String token = jwtService.gerarTokenServico(UUID.randomUUID().toString(), "PACIENTE", "x@sgsm.com.br");
+
+        Claims claims = jwtService.extrairClaims(token);
+
+        long ttlSegundos = (claims.getExpiration().getTime() - claims.getIssuedAt().getTime()) / 1000;
+        assertThat(ttlSegundos).isLessThanOrEqualTo(120);
+    }
 }
