@@ -9,9 +9,15 @@ public interface PacienteRepository extends JpaRepository<Paciente, UUID> {
 
     List<Paciente> findAllByAtivo(Boolean ativo);
 
+    List<Paciente> findAllByNomeContainingIgnoreCase(String nome);
+
     boolean existsByCpf(String cpf);
 
     boolean existsByEmail(String email);
 
     boolean existsByEmailAndIdNot(String email, UUID id);
+
+    boolean existsByTelefone(String telefone);
+
+    boolean existsByTelefoneAndIdNot(String telefone, UUID id);
 }

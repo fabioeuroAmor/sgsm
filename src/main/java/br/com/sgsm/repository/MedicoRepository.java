@@ -18,4 +18,8 @@ public interface MedicoRepository extends JpaRepository<Medico, UUID> {
     boolean existsByEmail(String email);
 
     boolean existsByEmailAndIdNot(String email, UUID id);
+
+    boolean existsByTelefone(String telefone);
+
+    boolean existsByTelefoneAndIdNot(String telefone, UUID id);
 }

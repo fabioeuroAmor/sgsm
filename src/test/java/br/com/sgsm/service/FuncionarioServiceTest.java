@@ -133,6 +133,21 @@ class FuncionarioServiceTest {
         verify(repository, never()).save(any());
     }
 
+    @Test
+    void deveLancarExcecaoAoCadastrarComTelefoneDuplicado() {
+        UUID estabId = UUID.randomUUID();
+        var request = new CadastrarFuncionarioRequest("X", "000.000.000-00", "x@e.com", "11999998888", "Aux", estabId);
+        when(estabelecimentoRepository.existsById(estabId)).thenReturn(true);
+        when(contextoSeguranca.isMedico()).thenReturn(false);
+        when(repository.existsByCpf("000.000.000-00")).thenReturn(false);
+        when(repository.existsByTelefone("11999998888")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.cadastrar(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("11999998888");
+        verify(repository, never()).save(any());
+    }
+
     // ─── consultar ───────────────────────────────────────────────────────────
 
     @Test
@@ -325,6 +340,20 @@ class FuncionarioServiceTest {
 
         assertThatThrownBy(() -> service.atualizar(id, request))
                 .isInstanceOf(IllegalArgumentException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deveLancarExcecaoAoAtualizarComTelefoneDuplicado() {
+        UUID id = UUID.randomUUID();
+        UUID estabId = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(novoFuncionario(estabId)));
+        when(contextoSeguranca.isMedico()).thenReturn(false);
+        when(repository.existsByTelefoneAndIdNot("11999998888", id)).thenReturn(true);
+        var request = new AtualizarFuncionarioRequest(null, null, "11999998888", null);
+
+        assertThatThrownBy(() -> service.atualizar(id, request))
+                .isInstanceOf(IllegalStateException.class);
         verify(repository, never()).save(any());
     }
 

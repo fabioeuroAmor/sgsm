@@ -25,7 +25,7 @@ public class Paciente {
     @Column(nullable = false, length = 255, unique = true)
     private String email;
 
-    @Column(length = 20)
+    @Column(nullable = false, length = 20, unique = true)
     private String telefone;
 
     @Column(length = 255)

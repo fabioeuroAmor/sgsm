@@ -50,6 +50,9 @@ public class FuncionarioService {
         if (repository.existsByCpf(request.cpf())) {
             throw new IllegalArgumentException("CPF já cadastrado: " + request.cpf());
         }
+        if (repository.existsByTelefone(request.telefone())) {
+            throw new IllegalStateException("Telefone já cadastrado: " + request.telefone());
+        }
 
         var funcionario = modelMapper.map(request, Funcionario.class);
         return modelMapper.map(repository.save(funcionario), FuncionarioResponse.class);
@@ -111,6 +114,9 @@ public class FuncionarioService {
         }
         if (request.email() != null && repository.existsByEmailAndIdNot(request.email(), id)) {
             throw new IllegalArgumentException("E-mail já cadastrado: " + request.email());
+        }
+        if (request.telefone() != null && repository.existsByTelefoneAndIdNot(request.telefone(), id)) {
+            throw new IllegalStateException("Telefone já cadastrado: " + request.telefone());
         }
         modelMapper.map(request, funcionario);
         return modelMapper.map(repository.save(funcionario), FuncionarioResponse.class);

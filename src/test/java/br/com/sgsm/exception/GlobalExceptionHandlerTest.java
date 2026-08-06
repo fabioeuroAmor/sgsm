@@ -74,6 +74,19 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void deveRetornar409QuandoConflitoDeEstado() {
+        when(request.getRequestURI()).thenReturn("/v1/api/pacientes");
+        var ex = new IllegalStateException("Telefone já cadastrado: 11999998888");
+
+        ResponseEntity<ProblemDetail> response = handler.handleConflito(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().getDetail()).isEqualTo("Telefone já cadastrado: 11999998888");
+        assertThat(response.getBody().getTitle()).isEqualTo("Conflito de estado");
+        assertThat(response.getBody().getType().toString()).isEqualTo("https://sgsm.com.br/erros/conflito");
+    }
+
+    @Test
     void deveRetornar500ComMensagemGenericaQuandoErroInterno() {
         when(request.getRequestURI()).thenReturn("/v1/api/medicos");
         var ex = new RuntimeException("NullPointerException interna qualquer");

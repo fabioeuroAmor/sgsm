@@ -48,6 +48,9 @@ public class PacienteService {
         if (repository.existsByEmail(request.email())) {
             throw new IllegalArgumentException("E-mail já cadastrado: " + request.email());
         }
+        if (repository.existsByTelefone(request.telefone())) {
+            throw new IllegalStateException("Telefone já cadastrado: " + request.telefone());
+        }
 
         var paciente = modelMapper.map(request, Paciente.class);
         var salvo = repository.save(paciente);
@@ -85,6 +88,9 @@ public class PacienteService {
         if (request.email() != null && repository.existsByEmailAndIdNot(request.email(), id)) {
             throw new IllegalArgumentException("E-mail já cadastrado: " + request.email());
         }
+        if (request.telefone() != null && repository.existsByTelefoneAndIdNot(request.telefone(), id)) {
+            throw new IllegalStateException("Telefone já cadastrado: " + request.telefone());
+        }
 
         modelMapper.map(request, paciente);
         var salvo = repository.save(paciente);
@@ -101,16 +107,21 @@ public class PacienteService {
 
     // UC - Listar pacientes
     @Transactional(readOnly = true)
-    public List<PacienteResponse> listar(Boolean ativo) {
+    public List<PacienteResponse> listar(Boolean ativo, String nome) {
         if (contextoSeguranca.isPaciente()) {
             UUID id = contextoSeguranca.getReferenciaId();
             return repository.findById(id)
                     .map(p -> List.of(modelMapper.map(p, PacienteResponse.class)))
                     .orElse(List.of());
         }
-        List<Paciente> resultado = (ativo != null)
-                ? repository.findAllByAtivo(ativo)
-                : repository.findAll();
+        List<Paciente> resultado;
+        if (nome != null && !nome.isBlank()) {
+            resultado = repository.findAllByNomeContainingIgnoreCase(nome);
+        } else if (ativo != null) {
+            resultado = repository.findAllByAtivo(ativo);
+        } else {
+            resultado = repository.findAll();
+        }
         return resultado.stream()
                 .map(p -> modelMapper.map(p, PacienteResponse.class))
                 .toList();

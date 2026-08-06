@@ -104,6 +104,20 @@ class PacienteServiceTest {
     }
 
     @Test
+    void deveLancarExcecaoQuandoTelefoneJaCadastrado() {
+        when(repository.existsByCpf("12345678900")).thenReturn(false);
+        when(repository.existsByEmail("joao@sgsm.com.br")).thenReturn(false);
+        when(repository.existsByTelefone("11999998888")).thenReturn(true);
+        var request = new CadastrarPacienteRequest("João Silva", "12345678900",
+                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", "11999998888", null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.cadastrar(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("11999998888");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void deveConsultarPacienteQuandoNaoForPacienteNemMedico() {
         UUID id = UUID.randomUUID();
         when(contextoSeguranca.isPaciente()).thenReturn(false);
@@ -208,6 +222,19 @@ class PacienteServiceTest {
     }
 
     @Test
+    void deveLancarExcecaoAoAtualizarComTelefoneJaCadastradoPorOutroPaciente() {
+        UUID id = UUID.randomUUID();
+        when(contextoSeguranca.isPaciente()).thenReturn(false);
+        when(repository.findById(id)).thenReturn(Optional.of(novoPaciente()));
+        when(repository.existsByTelefoneAndIdNot("11999998888", id)).thenReturn(true);
+        var request = new AtualizarPacienteRequest(null, null, null, "11999998888", null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.atualizar(id, request))
+                .isInstanceOf(IllegalStateException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void deveInativarPacienteAoRemover() {
         UUID id = UUID.randomUUID();
         var paciente = novoPaciente();
@@ -235,7 +262,7 @@ class PacienteServiceTest {
         when(contextoSeguranca.getReferenciaId()).thenReturn(id);
         when(repository.findById(id)).thenReturn(Optional.of(novoPaciente()));
 
-        var resultado = service.listar(null);
+        var resultado = service.listar(null, null);
 
         assertThat(resultado).hasSize(1);
     }
@@ -247,7 +274,7 @@ class PacienteServiceTest {
         when(contextoSeguranca.getReferenciaId()).thenReturn(id);
         when(repository.findById(id)).thenReturn(Optional.empty());
 
-        var resultado = service.listar(null);
+        var resultado = service.listar(null, null);
 
         assertThat(resultado).isEmpty();
     }
@@ -257,7 +284,7 @@ class PacienteServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         when(repository.findAllByAtivo(true)).thenReturn(List.of(novoPaciente()));
 
-        var resultado = service.listar(true);
+        var resultado = service.listar(true, null);
 
         assertThat(resultado).hasSize(1);
     }
@@ -267,7 +294,7 @@ class PacienteServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         when(repository.findAll()).thenReturn(List.of(novoPaciente()));
 
-        var resultado = service.listar(null);
+        var resultado = service.listar(null, null);
 
         assertThat(resultado).hasSize(1);
     }
@@ -277,7 +304,7 @@ class PacienteServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         when(repository.findAllByAtivo(true)).thenReturn(List.of(novoPaciente()));
 
-        var resultado = service.listar(true);
+        var resultado = service.listar(true, null);
 
         assertThat(resultado).hasSize(1);
     }
@@ -287,8 +314,19 @@ class PacienteServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         when(repository.findAll()).thenReturn(List.of(novoPaciente()));
 
-        var resultado = service.listar(null);
+        var resultado = service.listar(null, null);
 
         assertThat(resultado).hasSize(1);
+    }
+
+    @Test
+    void deveListarPacientesPorNomeQuandoNomeInformado() {
+        when(contextoSeguranca.isPaciente()).thenReturn(false);
+        when(repository.findAllByNomeContainingIgnoreCase("Silva")).thenReturn(List.of(novoPaciente()));
+
+        var resultado = service.listar(null, "Silva");
+
+        assertThat(resultado).hasSize(1);
+        verify(repository, never()).findAll();
     }
 }

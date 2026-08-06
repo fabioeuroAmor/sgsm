@@ -21,7 +21,7 @@ public class Funcionario {
     @Column(nullable = false, length = 255)
     private String email;
 
-    @Column(length = 20)
+    @Column(nullable = false, length = 20, unique = true)
     private String telefone;
 
     @Column(nullable = false, length = 100)

@@ -108,6 +108,19 @@ class MedicoServiceTest {
     }
 
     @Test
+    void deveLancarExcecaoQuandoTelefoneJaCadastrado() {
+        when(repository.existsByCrmAndCrmUf("12345", "SP")).thenReturn(false);
+        when(repository.existsByEmail("ana@sgsm.com.br")).thenReturn(false);
+        when(repository.existsByTelefone("11999998888")).thenReturn(true);
+        var request = new CadastrarMedicoRequest("Dra. Ana Souza", "12345", "SP", "Cardiologia", "ana@sgsm.com.br", "11999998888");
+
+        assertThatThrownBy(() -> service.cadastrar(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("11999998888");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void deveConsultarMedicoQuandoNaoForMedicoAutenticado() {
         UUID id = UUID.randomUUID();
         when(contextoSeguranca.isMedico()).thenReturn(false);
@@ -190,6 +203,19 @@ class MedicoServiceTest {
 
         assertThatThrownBy(() -> service.atualizar(id, request))
                 .isInstanceOf(IllegalArgumentException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deveLancarExcecaoAoAtualizarComTelefoneJaCadastradoPorOutroMedico() {
+        UUID id = UUID.randomUUID();
+        when(contextoSeguranca.isMedico()).thenReturn(false);
+        when(repository.findById(id)).thenReturn(Optional.of(novoMedico()));
+        when(repository.existsByTelefoneAndIdNot("11999998888", id)).thenReturn(true);
+        var request = new AtualizarMedicoRequest(null, null, null, "11999998888");
+
+        assertThatThrownBy(() -> service.atualizar(id, request))
+                .isInstanceOf(IllegalStateException.class);
         verify(repository, never()).save(any());
     }
 

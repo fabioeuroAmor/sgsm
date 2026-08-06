@@ -83,9 +83,20 @@ class PacienteControllerTest {
     @Test
     void deveRetornar200ComListaAoListar() {
         var resposta = new PacienteResponse();
-        when(service.listar(true)).thenReturn(List.of(resposta));
+        when(service.listar(true, null)).thenReturn(List.of(resposta));
 
-        var response = controller.listar(true);
+        var response = controller.listar(true, null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsExactly(resposta);
+    }
+
+    @Test
+    void deveRetornar200ComListaAoListarPorNome() {
+        var resposta = new PacienteResponse();
+        when(service.listar(null, "Maria")).thenReturn(List.of(resposta));
+
+        var response = controller.listar(null, "Maria");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsExactly(resposta);

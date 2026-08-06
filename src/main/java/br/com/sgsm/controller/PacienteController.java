@@ -51,7 +51,8 @@ public class PacienteController {
     // UC - Listar pacientes
     @GetMapping
     public ResponseEntity<List<PacienteResponse>> listar(
-            @RequestParam(required = false) Boolean ativo) {
-        return ResponseEntity.ok(service.listar(ativo));
+            @RequestParam(required = false) Boolean ativo,
+            @RequestParam(required = false) String nome) {
+        return ResponseEntity.ok(service.listar(ativo, nome));
     }
 }

@@ -41,6 +41,9 @@ public class MedicoService {
         if (repository.existsByEmail(request.email())) {
             throw new IllegalArgumentException("E-mail já cadastrado: " + request.email());
         }
+        if (repository.existsByTelefone(request.telefone())) {
+            throw new IllegalStateException("Telefone já cadastrado: " + request.telefone());
+        }
 
         var medico = modelMapper.map(request, Medico.class);
         medico.setCrmUf(medico.getCrmUf().toUpperCase());
@@ -69,6 +72,9 @@ public class MedicoService {
 
         if (request.email() != null && repository.existsByEmailAndIdNot(request.email(), id)) {
             throw new IllegalArgumentException("E-mail já cadastrado: " + request.email());
+        }
+        if (request.telefone() != null && repository.existsByTelefoneAndIdNot(request.telefone(), id)) {
+            throw new IllegalStateException("Telefone já cadastrado: " + request.telefone());
         }
 
         modelMapper.map(request, medico);
