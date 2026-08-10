@@ -1,3 +1,7 @@
+logging:
+  file:
+    name: sgsm.log
+
 spring:
   application:
     name: sgsm
@@ -9,9 +13,9 @@ spring:
     hikari:
       connectionTimeout: 20000
       maximumPoolSize: 5
-    url: jdbc:postgresql://localhost:5432/postgres?stringtype=unspecified
-    username: postgres
-    password: postgres
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/postgres?stringtype=unspecified}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
   jpa:
     properties:
       hibernate:
@@ -26,7 +30,8 @@ spring:
       port: ${REDIS_PORT:6379}
 
 jwt:
-  secret: ${JWT_SECRET:sgsm-chave-desenvolvimento-local-minimo-256-bits-nao-usar-em-producao}
+  # Compartilhado com ms-sboot-auth e sgsm-ia — os tres precisam do MESMO valor.
+  secret: ${JWT_SECRET:?defina JWT_SECRET (mesmo valor usado em ms-sboot-auth e sgsm-ia) antes de subir}
 
 ia:
   base-url: ${IA_BASE_URL:http://localhost:8082}
