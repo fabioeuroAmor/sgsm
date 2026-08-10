@@ -95,3 +95,8 @@ application-local.yml
 # DOCKER (sobrescritas locais)
 # ============================================================
 docker-compose.override.yml
+
+# ============================================================
+# GRAPHIFY (saida de analise local, nao faz parte do codigo)
+# ============================================================
+graphify-out/
