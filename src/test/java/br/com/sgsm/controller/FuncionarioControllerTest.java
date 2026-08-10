@@ -1,7 +1,9 @@
 package br.com.sgsm.controller;
 
-import br.com.sgsm.dto.*;
-import br.com.sgsm.service.EstabelecimentoService;
+import br.com.sgsm.dto.AtualizarFuncionarioRequest;
+import br.com.sgsm.dto.CadastrarFuncionarioRequest;
+import br.com.sgsm.dto.FuncionarioResponse;
+import br.com.sgsm.service.FuncionarioService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,23 +19,23 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class EstabelecimentoControllerTest {
+class FuncionarioControllerTest {
 
     @Mock
-    private EstabelecimentoService service;
+    private FuncionarioService service;
 
-    private EstabelecimentoController controller;
+    private FuncionarioController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new EstabelecimentoController(service);
+        controller = new FuncionarioController(service);
     }
 
     @Test
     void deveRetornar201AoCadastrar() {
-        var request = new CadastrarEstabelecimentoRequest(
-                "Clínica Central", "12345678000199", null, null, "Rua A", "100", null, "Centro", "São Paulo", "SP", "01000-000");
-        var resposta = new EstabelecimentoResponse();
+        UUID estabelecimentoId = UUID.randomUUID();
+        var request = new CadastrarFuncionarioRequest("Maria Silva", "123.456.789-00", "maria@email.com", null, "Recepcionista", estabelecimentoId);
+        var resposta = new FuncionarioResponse();
         when(service.cadastrar(request)).thenReturn(resposta);
 
         var response = controller.cadastrar(request);
@@ -45,7 +47,7 @@ class EstabelecimentoControllerTest {
     @Test
     void deveRetornar200AoConsultar() {
         UUID id = UUID.randomUUID();
-        var resposta = new EstabelecimentoResponse();
+        var resposta = new FuncionarioResponse();
         when(service.consultar(id)).thenReturn(resposta);
 
         var response = controller.consultar(id);
@@ -57,9 +59,8 @@ class EstabelecimentoControllerTest {
     @Test
     void deveRetornar200AoAtualizar() {
         UUID id = UUID.randomUUID();
-        var request = new AtualizarEstabelecimentoRequest(
-                "Clínica Central Ltda", null, null, null, null, null, null, null, null, null);
-        var resposta = new EstabelecimentoResponse();
+        var request = new AtualizarFuncionarioRequest("Maria Souza", null, null, null);
+        var resposta = new FuncionarioResponse();
         when(service.atualizar(id, request)).thenReturn(resposta);
 
         var response = controller.atualizar(id, request);
@@ -80,47 +81,24 @@ class EstabelecimentoControllerTest {
 
     @Test
     void deveRetornar200ComListaAoListar() {
-        var resposta = new EstabelecimentoResponse();
-        when(service.listar(true, "SP", "São Paulo", null)).thenReturn(List.of(resposta));
+        UUID estabelecimentoId = UUID.randomUUID();
+        var resposta = new FuncionarioResponse();
+        when(service.listar(estabelecimentoId, true)).thenReturn(List.of(resposta));
 
-        var response = controller.listar(true, "SP", "São Paulo", null);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).containsExactly(resposta);
-    }
-
-    @Test
-    void deveRetornar200ComListaFiltradaPorMedicoId() {
-        UUID medicoId = UUID.randomUUID();
-        var resposta = new EstabelecimentoResponse();
-        when(service.listar(true, null, null, medicoId)).thenReturn(List.of(resposta));
-
-        var response = controller.listar(true, null, null, medicoId);
+        var response = controller.listar(estabelecimentoId, true);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsExactly(resposta);
     }
 
     @Test
-    void deveRetornar200ComListaDeMedicosVinculados() {
-        UUID id = UUID.randomUUID();
-        var medico = new MedicoResponse();
-        when(service.listarMedicos(id)).thenReturn(List.of(medico));
+    void deveRetornar200ComListaSemFiltrosAoListar() {
+        var resposta = new FuncionarioResponse();
+        when(service.listar(null, null)).thenReturn(List.of(resposta));
 
-        var response = controller.listarMedicos(id);
+        var response = controller.listar(null, null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).containsExactly(medico);
-    }
-
-    @Test
-    void deveRetornar204AoAssociarMedicos() {
-        UUID id = UUID.randomUUID();
-        var request = new AssociarMedicosRequest(List.of(UUID.randomUUID()));
-
-        var response = controller.associarMedicos(id, request);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        verify(service).associarMedicos(id, request);
+        assertThat(response.getBody()).containsExactly(resposta);
     }
 }

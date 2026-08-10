@@ -5,6 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,10 +18,14 @@ import java.util.List;
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    private final JwtService jwtService;
+    private static final String BLACKLIST_PREFIX = "blacklist:";
 
-    public JwtAuthFilter(JwtService jwtService) {
+    private final JwtService jwtService;
+    private final StringRedisTemplate redis;
+
+    public JwtAuthFilter(JwtService jwtService, StringRedisTemplate redis) {
         this.jwtService = jwtService;
+        this.redis = redis;
     }
 
     @Override
@@ -45,6 +50,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         Claims claims = jwtService.extrairClaims(token);
 
+        // Verifica blacklist: token revogado via logout → 401
+        String jti = claims.getId();
+        if (jti != null && Boolean.TRUE.equals(redis.hasKey(BLACKLIST_PREFIX + jti))) {
+            chain.doFilter(request, response);
+            return;
+        }
+
         List<String> roles = claims.get("roles", List.class);
         List<SimpleGrantedAuthority> authorities = roles == null ? List.of() :
                 roles.stream()
@@ -54,7 +66,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         var auth = new UsernamePasswordAuthenticationToken(
                 claims.getSubject(), null, authorities);
 
-        // Disponibiliza contexto de segurança para os Services
         request.setAttribute("referenciaId", claims.get("referenciaId", String.class));
         request.setAttribute("perfil", claims.get("perfil", String.class));
         request.setAttribute("email", claims.get("email", String.class));

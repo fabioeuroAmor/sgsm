@@ -3,6 +3,7 @@ package br.com.sgsm.service;
 import br.com.sgsm.domain.Estabelecimento;
 import br.com.sgsm.domain.MedicoEstabelecimento;
 import br.com.sgsm.dto.*;
+import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.EstabelecimentoRepository;
 import br.com.sgsm.repository.MedicoEstabelecimentoRepository;
@@ -22,16 +23,19 @@ public class EstabelecimentoService {
     private final MedicoEstabelecimentoRepository medicoEstabelecimentoRepository;
     private final MedicoRepository medicoRepository;
     private final ModelMapper modelMapper;
+    private final VetorizacaoPublisher vetorizacaoPublisher;
 
     public EstabelecimentoService(
             EstabelecimentoRepository repository,
             MedicoEstabelecimentoRepository medicoEstabelecimentoRepository,
             MedicoRepository medicoRepository,
-            ModelMapper modelMapper) {
+            ModelMapper modelMapper,
+            VetorizacaoPublisher vetorizacaoPublisher) {
         this.repository = repository;
         this.medicoEstabelecimentoRepository = medicoEstabelecimentoRepository;
         this.medicoRepository = medicoRepository;
         this.modelMapper = modelMapper;
+        this.vetorizacaoPublisher = vetorizacaoPublisher;
     }
 
     public EstabelecimentoResponse cadastrar(CadastrarEstabelecimentoRequest request) {
@@ -41,8 +45,9 @@ public class EstabelecimentoService {
 
         var estabelecimento = modelMapper.map(request, Estabelecimento.class);
         estabelecimento.setUf(estabelecimento.getUf().toUpperCase());
-
-        return modelMapper.map(repository.save(estabelecimento), EstabelecimentoResponse.class);
+        var salvo = repository.save(estabelecimento);
+        vetorizacaoPublisher.publicar("ESTABELECIMENTO", salvo.getId().toString(), "CREATE");
+        return modelMapper.map(salvo, EstabelecimentoResponse.class);
     }
 
     @Transactional(readOnly = true)
@@ -60,7 +65,9 @@ public class EstabelecimentoService {
             estabelecimento.setUf(estabelecimento.getUf().toUpperCase());
         }
 
-        return modelMapper.map(repository.save(estabelecimento), EstabelecimentoResponse.class);
+        var salvo = repository.save(estabelecimento);
+        vetorizacaoPublisher.publicar("ESTABELECIMENTO", salvo.getId().toString(), "UPDATE");
+        return modelMapper.map(salvo, EstabelecimentoResponse.class);
     }
 
     public void remover(UUID id) {
@@ -71,9 +78,25 @@ public class EstabelecimentoService {
 
     @Transactional(readOnly = true)
     public List<EstabelecimentoResponse> listar(Boolean ativo, String uf, String cidade) {
+        return listar(ativo, uf, cidade, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EstabelecimentoResponse> listar(Boolean ativo, String uf, String cidade, UUID medicoId) {
         List<Estabelecimento> resultado;
 
-        if (uf != null && ativo != null) {
+        if (medicoId != null) {
+            List<UUID> ids = medicoEstabelecimentoRepository
+                    .findById_MedicoIdAndAtivo(medicoId, true)
+                    .stream()
+                    .map(me -> me.getId().getEstabelecimentoId())
+                    .toList();
+            resultado = (List<Estabelecimento>) repository.findAllById(ids);
+            if (ativo != null) {
+                final Boolean filtroAtivo = ativo;
+                resultado = resultado.stream().filter(e -> filtroAtivo.equals(e.getAtivo())).toList();
+            }
+        } else if (uf != null && ativo != null) {
             resultado = repository.findAllByUfAndAtivo(uf.toUpperCase(), ativo);
         } else if (cidade != null && ativo != null) {
             resultado = repository.findAllByCidadeAndAtivo(cidade, ativo);

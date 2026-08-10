@@ -6,7 +6,9 @@ import br.com.sgsm.dto.AtualizarMedicoRequest;
 import br.com.sgsm.dto.CadastrarMedicoRequest;
 import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
+import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.repository.MedicoRepository;
+import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.security.ContextoSeguranca;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,12 +32,14 @@ class MedicoServiceTest {
     private MedicoRepository repository;
     @Mock
     private ContextoSeguranca contextoSeguranca;
+    @Mock
+    private VetorizacaoPublisher vetorizacaoPublisher;
 
     private MedicoService service;
 
     @BeforeEach
     void setUp() {
-        service = new MedicoService(repository, new ModelMapperConfig().modelMapper(), contextoSeguranca);
+        service = new MedicoService(repository, new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher);
     }
 
     private Medico novoMedico() {
@@ -53,7 +57,11 @@ class MedicoServiceTest {
     void deveCadastrarMedicoQuandoCrmEEmailInexistentes() {
         when(repository.existsByCrmAndCrmUf("12345", "SP")).thenReturn(false);
         when(repository.existsByEmail("ana@sgsm.com.br")).thenReturn(false);
-        when(repository.save(any(Medico.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.save(any(Medico.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
         var request = new CadastrarMedicoRequest("Dra. Ana Souza", "12345", "SP", "Cardiologia", "ana@sgsm.com.br", null);
 
         var response = service.cadastrar(request);
@@ -64,7 +72,11 @@ class MedicoServiceTest {
 
     @Test
     void deveNormalizarUfDoCrmParaMaiuscula() {
-        when(repository.save(any(Medico.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.save(any(Medico.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
         var request = new CadastrarMedicoRequest("Dra. Ana Souza", "12345", "sp", "Cardiologia", "ana@sgsm.com.br", null);
 
         var response = service.cadastrar(request);
@@ -144,7 +156,11 @@ class MedicoServiceTest {
         UUID id = UUID.randomUUID();
         when(contextoSeguranca.isMedico()).thenReturn(false);
         when(repository.findById(id)).thenReturn(Optional.of(novoMedico()));
-        when(repository.save(any(Medico.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.save(any(Medico.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
         var request = new AtualizarMedicoRequest("Dra. Ana Souza Lima", null, null, null);
 
         var response = service.atualizar(id, request);

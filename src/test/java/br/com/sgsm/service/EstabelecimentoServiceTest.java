@@ -8,7 +8,9 @@ import br.com.sgsm.dto.AssociarMedicosRequest;
 import br.com.sgsm.dto.AtualizarEstabelecimentoRequest;
 import br.com.sgsm.dto.CadastrarEstabelecimentoRequest;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
+import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.repository.EstabelecimentoRepository;
+import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.repository.MedicoEstabelecimentoRepository;
 import br.com.sgsm.repository.MedicoRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,13 +37,15 @@ class EstabelecimentoServiceTest {
     private MedicoEstabelecimentoRepository medicoEstabelecimentoRepository;
     @Mock
     private MedicoRepository medicoRepository;
+    @Mock
+    private VetorizacaoPublisher vetorizacaoPublisher;
 
     private EstabelecimentoService service;
 
     @BeforeEach
     void setUp() {
         service = new EstabelecimentoService(repository, medicoEstabelecimentoRepository,
-                medicoRepository, new ModelMapperConfig().modelMapper());
+                medicoRepository, new ModelMapperConfig().modelMapper(), vetorizacaoPublisher);
     }
 
     private Estabelecimento novoEstabelecimento() {
@@ -67,7 +71,11 @@ class EstabelecimentoServiceTest {
     @Test
     void deveCadastrarEstabelecimentoENormalizarUfParaMaiuscula() {
         when(repository.existsByCnpj("12345678000199")).thenReturn(false);
-        when(repository.save(any(Estabelecimento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.save(any(Estabelecimento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
 
         var response = service.cadastrar(novaRequestCadastro("sp"));
 
@@ -107,7 +115,11 @@ class EstabelecimentoServiceTest {
     void deveAtualizarEstabelecimentoENormalizarUf() {
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.of(novoEstabelecimento()));
-        when(repository.save(any(Estabelecimento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.save(any(Estabelecimento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
         var request = new AtualizarEstabelecimentoRequest(
                 "Clínica Central Ltda", null, null, null, null, null, null, null, "rj", null);
 
@@ -121,7 +133,11 @@ class EstabelecimentoServiceTest {
     void deveAtualizarEstabelecimentoSemAlterarUfQuandoNaoInformada() {
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.of(novoEstabelecimento()));
-        when(repository.save(any(Estabelecimento.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.save(any(Estabelecimento.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
         var request = new AtualizarEstabelecimentoRequest(
                 "Clínica Central Ltda", null, null, null, null, null, null, null, null, null);
 
@@ -213,6 +229,37 @@ class EstabelecimentoServiceTest {
         when(repository.findAll()).thenReturn(List.of(novoEstabelecimento()));
 
         var resultado = service.listar(null, null, null);
+
+        assertThat(resultado).hasSize(1);
+    }
+
+    @Test
+    void deveListarEstabelecimentosVinculadosQuandoMedicoIdInformado() {
+        UUID medicoId = UUID.randomUUID();
+        UUID estabelecimentoId = UUID.randomUUID();
+        var vinculo = new MedicoEstabelecimento(medicoId, estabelecimentoId);
+        var est = novoEstabelecimento();
+        when(medicoEstabelecimentoRepository.findById_MedicoIdAndAtivo(medicoId, true))
+                .thenReturn(List.of(vinculo));
+        when(repository.findAllById(List.of(estabelecimentoId))).thenReturn(List.of(est));
+
+        var resultado = service.listar(null, null, null, medicoId);
+
+        assertThat(resultado).hasSize(1);
+        verify(medicoEstabelecimentoRepository).findById_MedicoIdAndAtivo(medicoId, true);
+    }
+
+    @Test
+    void deveListarEstabelecimentosVinculadosAtivosQuandoMedicoIdEAtivoInformados() {
+        UUID medicoId = UUID.randomUUID();
+        UUID estabelecimentoId = UUID.randomUUID();
+        var vinculo = new MedicoEstabelecimento(medicoId, estabelecimentoId);
+        var est = novoEstabelecimento();
+        when(medicoEstabelecimentoRepository.findById_MedicoIdAndAtivo(medicoId, true))
+                .thenReturn(List.of(vinculo));
+        when(repository.findAllById(List.of(estabelecimentoId))).thenReturn(List.of(est));
+
+        var resultado = service.listar(true, null, null, medicoId);
 
         assertThat(resultado).hasSize(1);
     }
