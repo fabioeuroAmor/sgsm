@@ -4,26 +4,8 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
 
-  datasource:
-    hikari:
-      connectionTimeout: 20000
-      maximumPoolSize: 5
-    url: jdbc:postgresql://localhost:5432/postgres?stringtype=unspecified
-    username: postgres
-    password: postgres
-  jpa:
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        default_schema: sgsm
-      ddl-auto: none
-    show-sql: true
-
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-
-jwt:
-  secret: ${JWT_SECRET:sgsm-chave-desenvolvimento-local-minimo-256-bits-nao-usar-em-producao}
+server:
+  port: ${SERVER_PORT:8080}
