@@ -1,6 +1,8 @@
 package br.com.sgsm.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -12,6 +14,8 @@ import java.net.URI;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(RecursoNaoEncontradoException.class)
     public ResponseEntity<ProblemDetail> handleNaoEncontrado(RecursoNaoEncontradoException ex, HttpServletRequest request) {
@@ -40,6 +44,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleErroInterno(Exception ex, HttpServletRequest request) {
+        log.error("Erro interno nao mapeado em {} {}: {}", request.getMethod(), request.getRequestURI(),
+                ex.getMessage(), ex);
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "erro-interno", "Erro interno",
                 "Erro interno. Tente novamente mais tarde.", request);
     }

@@ -33,14 +33,11 @@ jwt:
   # Compartilhado com ms-sboot-auth e sgsm-ia — os tres precisam do MESMO valor.
   secret: ${JWT_SECRET:?defina JWT_SECRET (mesmo valor usado em ms-sboot-auth e sgsm-ia) antes de subir}
 
-ia:
-  base-url: ${IA_BASE_URL:http://localhost:8082}
-
+# Evolution API: usada so pelo envio de notificacoes proativas (NotificacaoConsumer).
+# O canal inbound (webhook, classificacao RAG, OTP) foi migrado para o ms-whatsapp-bot
+# (Desenho de Solucao V3, 2026-08-10).
 evolution:
   api:
-    url: ${EVOLUTION_API_URL:http://localhost:8084}
+    url: ${EVOLUTION_API_URL:http://localhost:8090}
     key: ${EVOLUTION_API_KEY:}
-    instance: ${EVOLUTION_INSTANCE:sgsm}
-
-whatsapp:
-  webhook-token: ${WHATSAPP_WEBHOOK_TOKEN:}
+    instance: ${EVOLUTION_INSTANCE:sgsm-bot}
