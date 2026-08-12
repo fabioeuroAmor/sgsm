@@ -10,8 +10,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -71,6 +78,34 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getDetail()).isEqualTo("CRM já cadastrado");
         assertThat(response.getBody().getTitle()).isEqualTo("Requisição inválida");
         assertThat(response.getBody().getType().toString()).isEqualTo("https://sgsm.com.br/erros/argumento-invalido");
+    }
+
+    @Test
+    void deveRetornar400ComListaDeErrosQuandoValidacaoFalha() {
+        when(request.getRequestURI()).thenReturn("/v1/api/medicos");
+
+        var bindingResult = new BeanPropertyBindingResult(new Object(), "cadastrarMedicoRequest");
+        bindingResult.addError(new FieldError("cadastrarMedicoRequest", "nome",
+                "Nome é obrigatório e deve ter entre 3 e 100 caracteres"));
+        bindingResult.addError(new FieldError("cadastrarMedicoRequest", "crmUf", "UF do CRM inválida"));
+        var ex = new MethodArgumentNotValidException(mock(org.springframework.core.MethodParameter.class), bindingResult);
+
+        ResponseEntity<ProblemDetail> response = handler.handleValidacao(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().getTitle()).isEqualTo("Requisição inválida");
+
+        @SuppressWarnings("unchecked")
+        var erros = (List<Map<String, String>>) response.getBody().getProperties().get("errors");
+        assertThat(erros).hasSize(2);
+        assertThat(erros).anySatisfy(erro -> {
+            assertThat(erro.get("field")).isEqualTo("nome");
+            assertThat(erro.get("message")).isEqualTo("Nome é obrigatório e deve ter entre 3 e 100 caracteres");
+        });
+        assertThat(erros).anySatisfy(erro -> {
+            assertThat(erro.get("field")).isEqualTo("crmUf");
+            assertThat(erro.get("message")).isEqualTo("UF do CRM inválida");
+        });
     }
 
     @Test

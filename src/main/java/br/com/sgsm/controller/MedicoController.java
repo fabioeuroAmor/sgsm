@@ -4,6 +4,7 @@ import br.com.sgsm.dto.AtualizarMedicoRequest;
 import br.com.sgsm.dto.CadastrarMedicoRequest;
 import br.com.sgsm.dto.MedicoResponse;
 import br.com.sgsm.service.MedicoService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +24,7 @@ public class MedicoController {
 
     // UC - Cadastrar médico
     @PostMapping
-    public ResponseEntity<MedicoResponse> cadastrar(@RequestBody CadastrarMedicoRequest request) {
+    public ResponseEntity<MedicoResponse> cadastrar(@Valid @RequestBody CadastrarMedicoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.cadastrar(request));
     }
 

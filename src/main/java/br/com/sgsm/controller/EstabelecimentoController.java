@@ -2,6 +2,7 @@ package br.com.sgsm.controller;
 
 import br.com.sgsm.dto.*;
 import br.com.sgsm.service.EstabelecimentoService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,7 @@ public class EstabelecimentoController {
 
     // UC - Cadastrar estabelecimento
     @PostMapping
-    public ResponseEntity<EstabelecimentoResponse> cadastrar(@RequestBody CadastrarEstabelecimentoRequest request) {
+    public ResponseEntity<EstabelecimentoResponse> cadastrar(@Valid @RequestBody CadastrarEstabelecimentoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.cadastrar(request));
     }
 
