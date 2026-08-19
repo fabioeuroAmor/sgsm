@@ -215,32 +215,17 @@ class MedicoServiceTest {
     }
 
     @Test
-    void deveListarApenasProprioMedicoQuandoAutenticadoComoMedico() {
-        UUID id = UUID.randomUUID();
-        when(contextoSeguranca.isMedico()).thenReturn(true);
-        when(contextoSeguranca.getReferenciaId()).thenReturn(id);
-        when(repository.findById(id)).thenReturn(Optional.of(novoMedico()));
+    void deveListarTodosOsMedicosMesmoQuandoAutenticadoComoMedico() {
+        when(repository.findAll()).thenReturn(List.of(novoMedico(), novoMedico()));
 
         var resultado = service.listar(null, null);
 
-        assertThat(resultado).hasSize(1);
+        assertThat(resultado).hasSize(2);
+        verify(contextoSeguranca, never()).isMedico();
     }
 
     @Test
-    void deveRetornarListaVaziaQuandoMedicoAutenticadoNaoEncontrado() {
-        UUID id = UUID.randomUUID();
-        when(contextoSeguranca.isMedico()).thenReturn(true);
-        when(contextoSeguranca.getReferenciaId()).thenReturn(id);
-        when(repository.findById(id)).thenReturn(Optional.empty());
-
-        var resultado = service.listar(null, null);
-
-        assertThat(resultado).isEmpty();
-    }
-
-    @Test
-    void deveListarPorEspecialidadeEAtivoQuandoNaoForMedico() {
-        when(contextoSeguranca.isMedico()).thenReturn(false);
+    void deveListarPorEspecialidadeEAtivoQuandoAmbosInformados() {
         when(repository.findAllByEspecialidadeAndAtivo("Cardiologia", true)).thenReturn(List.of(novoMedico()));
 
         var resultado = service.listar(true, "Cardiologia");
@@ -250,7 +235,6 @@ class MedicoServiceTest {
 
     @Test
     void deveListarPorEspecialidadeQuandoApenasEspecialidadeInformada() {
-        when(contextoSeguranca.isMedico()).thenReturn(false);
         when(repository.findAllByEspecialidade("Cardiologia")).thenReturn(List.of(novoMedico()));
 
         var resultado = service.listar(null, "Cardiologia");
@@ -260,7 +244,6 @@ class MedicoServiceTest {
 
     @Test
     void deveListarPorAtivoQuandoApenasAtivoInformado() {
-        when(contextoSeguranca.isMedico()).thenReturn(false);
         when(repository.findAllByAtivo(true)).thenReturn(List.of(novoMedico()));
 
         var resultado = service.listar(true, null);
@@ -270,7 +253,6 @@ class MedicoServiceTest {
 
     @Test
     void deveListarTodosQuandoNenhumFiltroInformado() {
-        when(contextoSeguranca.isMedico()).thenReturn(false);
         when(repository.findAll()).thenReturn(List.of(novoMedico()));
 
         var resultado = service.listar(null, null);
