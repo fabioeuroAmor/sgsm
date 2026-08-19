@@ -96,6 +96,10 @@ public class EstabelecimentoService {
                 final Boolean filtroAtivo = ativo;
                 resultado = resultado.stream().filter(e -> filtroAtivo.equals(e.getAtivo())).toList();
             }
+        } else if (uf != null && cidade != null && ativo != null) {
+            resultado = repository.findAllByUfAndCidadeAndAtivo(uf.toUpperCase(), cidade, ativo);
+        } else if (uf != null && cidade != null) {
+            resultado = repository.findAllByUfAndCidade(uf.toUpperCase(), cidade);
         } else if (uf != null && ativo != null) {
             resultado = repository.findAllByUfAndAtivo(uf.toUpperCase(), ativo);
         } else if (cidade != null && ativo != null) {
