@@ -85,12 +85,6 @@ public class MedicoService {
 
     @Transactional(readOnly = true)
     public List<MedicoResponse> listar(Boolean ativo, String especialidade) {
-        if (contextoSeguranca.isMedico()) {
-            return repository.findById(contextoSeguranca.getReferenciaId())
-                    .map(m -> List.of(modelMapper.map(m, MedicoResponse.class)))
-                    .orElse(List.of());
-        }
-
         List<Medico> resultado;
 
         if (especialidade != null && ativo != null) {
