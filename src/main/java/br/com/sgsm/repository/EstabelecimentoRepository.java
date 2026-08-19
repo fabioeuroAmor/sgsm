@@ -17,5 +17,9 @@ public interface EstabelecimentoRepository extends JpaRepository<Estabelecimento
 
     List<Estabelecimento> findAllByCidadeAndAtivo(String cidade, Boolean ativo);
 
+    List<Estabelecimento> findAllByUfAndCidade(String uf, String cidade);
+
+    List<Estabelecimento> findAllByUfAndCidadeAndAtivo(String uf, String cidade, Boolean ativo);
+
     boolean existsByCnpj(String cnpj);
 }

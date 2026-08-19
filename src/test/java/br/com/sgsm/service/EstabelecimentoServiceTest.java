@@ -198,6 +198,26 @@ class EstabelecimentoServiceTest {
     }
 
     @Test
+    void deveListarPorUfECidadeQuandoAmbosInformadosSemAtivo() {
+        when(repository.findAllByUfAndCidade("GO", "Goiânia")).thenReturn(List.of(novoEstabelecimento()));
+
+        var resultado = service.listar(null, "go", "Goiânia");
+
+        assertThat(resultado).hasSize(1);
+        verify(repository).findAllByUfAndCidade("GO", "Goiânia");
+    }
+
+    @Test
+    void deveListarPorUfCidadeEAtivoQuandoTodosInformados() {
+        when(repository.findAllByUfAndCidadeAndAtivo("GO", "Goiânia", true)).thenReturn(List.of(novoEstabelecimento()));
+
+        var resultado = service.listar(true, "go", "Goiânia");
+
+        assertThat(resultado).hasSize(1);
+        verify(repository).findAllByUfAndCidadeAndAtivo("GO", "Goiânia", true);
+    }
+
+    @Test
     void deveListarPorUfQuandoApenasUfInformada() {
         when(repository.findAllByUf("SP")).thenReturn(List.of(novoEstabelecimento()));
 
