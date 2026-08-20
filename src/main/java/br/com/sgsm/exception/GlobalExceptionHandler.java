@@ -1,6 +1,7 @@
 package br.com.sgsm.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -26,6 +27,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ProblemDetail> handleArgumentoInvalido(IllegalArgumentException ex, HttpServletRequest request) {
         return problem(HttpStatus.BAD_REQUEST, "argumento-invalido", "Requisição inválida", ex.getMessage(), request);
+    }
+
+    // Condicao de corrida: duas requisicoes concorrentes passam pela checagem de
+    // duplicidade (existsByCpf/existsByEmail) antes de qualquer uma commitar, e a
+    // segunda a chegar no banco esbarra na constraint unica -- sem isso, virava 500 cru.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ProblemDetail> handleIntegridadeDados(DataIntegrityViolationException ex, HttpServletRequest request) {
+        return problem(HttpStatus.BAD_REQUEST, "dado-duplicado", "Dado já cadastrado",
+                "Um dos dados informados já está em uso. Verifique e tente novamente.", request);
     }
 
     @ExceptionHandler(Exception.class)

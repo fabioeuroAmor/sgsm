@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -71,6 +72,18 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getDetail()).isEqualTo("CRM já cadastrado");
         assertThat(response.getBody().getTitle()).isEqualTo("Requisição inválida");
         assertThat(response.getBody().getType().toString()).isEqualTo("https://sgsm.com.br/erros/argumento-invalido");
+    }
+
+    @Test
+    void deveRetornar400QuandoViolacaoDeIntegridadeDeDados() {
+        when(request.getRequestURI()).thenReturn("/v1/api/pacientes");
+        var ex = new DataIntegrityViolationException("duplicate key value violates unique constraint");
+
+        ResponseEntity<ProblemDetail> response = handler.handleIntegridadeDados(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().getTitle()).isEqualTo("Dado já cadastrado");
+        assertThat(response.getBody().getType().toString()).isEqualTo("https://sgsm.com.br/erros/dado-duplicado");
     }
 
     @Test

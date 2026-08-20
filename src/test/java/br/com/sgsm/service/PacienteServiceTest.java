@@ -71,7 +71,7 @@ class PacienteServiceTest {
             ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
             return e;
         });
-        var request = new CadastrarPacienteRequest("João Silva", "12345678900",
+        var request = new CadastrarPacienteRequest("João Silva", "52998224725",
                 LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
 
         var response = service.cadastrar(request);
@@ -80,22 +80,33 @@ class PacienteServiceTest {
     }
 
     @Test
-    void deveLancarExcecaoQuandoCpfJaCadastrado() {
-        when(repository.existsByCpf("12345678900")).thenReturn(true);
-        var request = new CadastrarPacienteRequest("João Silva", "12345678900",
+    void deveLancarExcecaoQuandoCpfInvalido() {
+        var request = new CadastrarPacienteRequest("João Silva", "11111111111",
                 LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> service.cadastrar(request))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("12345678900");
+                .hasMessageContaining("CPF inválido");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deveLancarExcecaoQuandoCpfJaCadastrado() {
+        when(repository.existsByCpf("52998224725")).thenReturn(true);
+        var request = new CadastrarPacienteRequest("João Silva", "52998224725",
+                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.cadastrar(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("52998224725");
         verify(repository, never()).save(any());
     }
 
     @Test
     void deveLancarExcecaoQuandoEmailJaCadastrado() {
-        when(repository.existsByCpf("12345678900")).thenReturn(false);
+        when(repository.existsByCpf("52998224725")).thenReturn(false);
         when(repository.existsByEmail("joao@sgsm.com.br")).thenReturn(true);
-        var request = new CadastrarPacienteRequest("João Silva", "12345678900",
+        var request = new CadastrarPacienteRequest("João Silva", "52998224725",
                 LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> service.cadastrar(request))
