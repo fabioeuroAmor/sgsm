@@ -15,6 +15,7 @@ import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Transactional
@@ -23,6 +24,7 @@ public class AgendamentoService {
     private static final ZoneId ZONA = ZoneId.of("America/Sao_Paulo");
     private static final List<StatusAgendamento> STATUS_IGNORADOS =
             List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
+    private final ConcurrentHashMap<UUID, Object> locksPorMedico = new ConcurrentHashMap<>();
 
     private final AgendamentoRepository agendamentoRepository;
     private final AgendaMedicoRepository agendaMedicoRepository;
@@ -110,6 +112,7 @@ public class AgendamentoService {
                 medicoId, inicioDia, fimDia, STATUS_IGNORADOS);
 
         List<SlotDisponivelResponse> slots = new ArrayList<>();
+        OffsetDateTime agora = OffsetDateTime.now(ZONA);
 
         for (AgendaMedico agenda : agendas) {
             LocalTime cursor = agenda.getHoraInicio();
@@ -123,7 +126,8 @@ public class AgendamentoService {
                 OffsetDateTime slotInicio = data.atTime(cursor).atZone(ZONA).toOffsetDateTime();
                 OffsetDateTime slotFim = slotInicio.plusMinutes(duracao);
 
-                if (!temBloqueio(slotInicio, slotFim, bloqueios)
+                if (!slotInicio.isBefore(agora)
+                        && !temBloqueio(slotInicio, slotFim, bloqueios)
                         && !estaOcupado(slotInicio, slotFim, ocupados)) {
                     slots.add(new SlotDisponivelResponse(slotInicio, slotFim, duracao));
                 }
@@ -164,21 +168,35 @@ public class AgendamentoService {
         }
 
         int duracao = servico.getDuracaoMinutos() != null ? servico.getDuracaoMinutos() : 30;
-        OffsetDateTime dataHoraFim = request.dataHoraInicio().plusMinutes(duracao);
+        OffsetDateTime dataHoraInicio = request.dataHoraInicio();
+        OffsetDateTime dataHoraFim = dataHoraInicio.plusMinutes(duracao);
+        UUID medicoId = servico.getMedicoId();
 
-        var agendamento = new Agendamento();
-        agendamento.setPacienteId(request.pacienteId());
-        agendamento.setServicoMedicoId(request.servicoMedicoId());
-        agendamento.setMedicoId(servico.getMedicoId());
-        agendamento.setEstabelecimentoId(tipo == TipoAgendamento.DOMICILIAR ? null : request.estabelecimentoId());
-        agendamento.setTipo(tipo);
-        agendamento.setDataHoraInicio(request.dataHoraInicio());
-        agendamento.setDataHoraFim(dataHoraFim);
-        agendamento.setObservacoes(request.observacoes());
+        synchronized (locksPorMedico.computeIfAbsent(medicoId, id -> new Object())) {
+            OffsetDateTime inicioDia = dataHoraInicio.atZoneSameInstant(ZONA).toLocalDate()
+                    .atStartOfDay(ZONA).toOffsetDateTime();
+            OffsetDateTime fimDia = inicioDia.plusDays(1);
+            var ocupados = agendamentoRepository.findOcupadosByMedicoAndData(
+                    medicoId, inicioDia, fimDia, STATUS_IGNORADOS);
+            if (estaOcupado(dataHoraInicio, dataHoraFim, ocupados)) {
+                throw new IllegalArgumentException(
+                        "Horário indisponível: já existe agendamento para este médico neste período.");
+            }
 
-        var salvo = agendamentoRepository.save(agendamento);
-        vetorizacaoPublisher.publicar("AGENDAMENTO", salvo.getId().toString(), "CREATE");
-        return toResponse(salvo);
+            var agendamento = new Agendamento();
+            agendamento.setPacienteId(request.pacienteId());
+            agendamento.setServicoMedicoId(request.servicoMedicoId());
+            agendamento.setMedicoId(medicoId);
+            agendamento.setEstabelecimentoId(tipo == TipoAgendamento.DOMICILIAR ? null : request.estabelecimentoId());
+            agendamento.setTipo(tipo);
+            agendamento.setDataHoraInicio(dataHoraInicio);
+            agendamento.setDataHoraFim(dataHoraFim);
+            agendamento.setObservacoes(request.observacoes());
+
+            var salvo = agendamentoRepository.saveAndFlush(agendamento);
+            vetorizacaoPublisher.publicar("AGENDAMENTO", salvo.getId().toString(), "CREATE");
+            return toResponse(salvo);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -198,7 +216,11 @@ public class AgendamentoService {
 
         List<Agendamento> resultado;
 
-        if (medicoId != null && status != null) {
+        if (medicoId != null && pacienteId != null && status != null) {
+            resultado = agendamentoRepository.findAllByMedicoIdAndPacienteIdAndStatus(medicoId, pacienteId, status);
+        } else if (medicoId != null && pacienteId != null) {
+            resultado = agendamentoRepository.findAllByMedicoIdAndPacienteId(medicoId, pacienteId);
+        } else if (medicoId != null && status != null) {
             resultado = agendamentoRepository.findAllByMedicoIdAndStatus(medicoId, status);
         } else if (pacienteId != null && status != null) {
             resultado = agendamentoRepository.findAllByPacienteIdAndStatus(pacienteId, status);

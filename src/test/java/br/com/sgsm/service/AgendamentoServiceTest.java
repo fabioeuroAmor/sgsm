@@ -16,9 +16,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -165,7 +167,7 @@ class AgendamentoServiceTest {
     void deveGerarSlotsPresenciaisRespeitandoBloqueiosEOcupados() {
         UUID medicoId = UUID.randomUUID();
         UUID estabelecimentoId = UUID.randomUUID();
-        LocalDate data = LocalDate.of(2026, 7, 20); // segunda-feira
+        LocalDate data = proximaSegunda();
 
         var agenda = new AgendaMedico();
         agenda.setHoraInicio(java.time.LocalTime.of(8, 0));
@@ -183,7 +185,7 @@ class AgendamentoServiceTest {
 
         var resultado = service.listarSlotsDisponiveis(medicoId, estabelecimentoId, data);
 
-        assertThat(resultado).hasSize(2); // 08:00-08:30 e 08:30-09:00
+        assertThat(resultado).hasSize(2); // 08:00-08:30 e 08:30-09:00, data futura (proxima segunda)
     }
 
     @Test
@@ -220,6 +222,10 @@ class AgendamentoServiceTest {
         assertThat(resultado).isEmpty(); // 08:00-08:30 bloqueado, 08:30-09:00 ocupado
     }
 
+    private LocalDate proximaSegunda() {
+        return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
+    }
+
     private void setPrivateField(Object target, String nome, Object valor) {
         try {
             var field = target.getClass().getDeclaredField(nome);
@@ -233,7 +239,7 @@ class AgendamentoServiceTest {
     @Test
     void deveGerarSlotsDomiciliaresComIntervaloDeDeslocamento() {
         UUID medicoId = UUID.randomUUID();
-        LocalDate data = LocalDate.of(2026, 7, 20); // segunda-feira
+        LocalDate data = proximaSegunda();
 
         var agenda = new AgendaMedico();
         agenda.setHoraInicio(java.time.LocalTime.of(8, 0));
@@ -289,7 +295,7 @@ class AgendamentoServiceTest {
         when(servicoMedicoRepository.findById(servicoId)).thenReturn(Optional.of(servico));
         when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(novoPaciente()));
         when(estabelecimentoRepository.findById(estabelecimentoId)).thenReturn(Optional.of(novoEstabelecimento(true)));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+        when(agendamentoRepository.saveAndFlush(any(Agendamento.class))).thenAnswer(inv -> {
             var e = inv.getArgument(0);
             ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
             return e;
@@ -312,7 +318,7 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         when(servicoMedicoRepository.findById(servicoId)).thenReturn(Optional.of(novoServico(medicoId, true)));
         when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(novoPaciente()));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+        when(agendamentoRepository.saveAndFlush(any(Agendamento.class))).thenAnswer(inv -> {
             var e = inv.getArgument(0);
             ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
             return e;
@@ -333,7 +339,7 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         when(servicoMedicoRepository.findById(servicoId)).thenReturn(Optional.of(novoServico(medicoId, true)));
         when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(novoPaciente()));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+        when(agendamentoRepository.saveAndFlush(any(Agendamento.class))).thenAnswer(inv -> {
             var e = inv.getArgument(0);
             ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
             return e;
@@ -359,7 +365,7 @@ class AgendamentoServiceTest {
         servico.setDuracaoMinutos(null);
         when(servicoMedicoRepository.findById(servicoId)).thenReturn(Optional.of(servico));
         when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(novoPaciente()));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+        when(agendamentoRepository.saveAndFlush(any(Agendamento.class))).thenAnswer(inv -> {
             var e = inv.getArgument(0);
             ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
             return e;
@@ -397,7 +403,7 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.getReferenciaId()).thenReturn(pacienteId);
         when(servicoMedicoRepository.findById(servicoId)).thenReturn(Optional.of(novoServico(medicoId, true)));
         when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(novoPaciente()));
-        when(agendamentoRepository.save(any(Agendamento.class))).thenAnswer(inv -> {
+        when(agendamentoRepository.saveAndFlush(any(Agendamento.class))).thenAnswer(inv -> {
             var e = inv.getArgument(0);
             ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
             return e;
@@ -409,6 +415,30 @@ class AgendamentoServiceTest {
         var response = service.cadastrar(request);
 
         assertThat(response).isNotNull();
+    }
+
+    @Test
+    void deveLancarExcecaoAoCadastrarQuandoMedicoJaTemAgendamentoNoMesmoHorario() {
+        UUID pacienteId = UUID.randomUUID();
+        UUID servicoId = UUID.randomUUID();
+        UUID medicoId = UUID.randomUUID();
+        OffsetDateTime inicio = OffsetDateTime.now().plusDays(1);
+        when(contextoSeguranca.isPaciente()).thenReturn(false);
+        when(servicoMedicoRepository.findById(servicoId)).thenReturn(Optional.of(novoServico(medicoId, true)));
+        when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(novoPaciente()));
+        var conflitante = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.CONFIRMADO, TipoAgendamento.PRESENCIAL);
+        conflitante.setDataHoraInicio(inicio);
+        conflitante.setDataHoraFim(inicio.plusMinutes(30));
+        when(agendamentoRepository.findOcupadosByMedicoAndData(eq(medicoId), any(), any(), anyList()))
+                .thenReturn(List.of(conflitante));
+
+        var request = new CadastrarAgendamentoRequest(pacienteId, servicoId, null,
+                TipoAgendamento.DOMICILIAR, inicio, null);
+
+        assertThatThrownBy(() -> service.cadastrar(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("indisponível");
+        verify(agendamentoRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -536,6 +566,21 @@ class AgendamentoServiceTest {
         var resultado = service.listar(null, StatusAgendamento.PENDENTE, null);
 
         assertThat(resultado).hasSize(1);
+    }
+
+    @Test
+    void deveFiltrarPorPacienteMesmoAutenticadoComoMedico() {
+        UUID medicoId = UUID.randomUUID();
+        UUID pacienteId = UUID.randomUUID();
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(medicoId);
+        when(agendamentoRepository.findAllByMedicoIdAndPacienteId(medicoId, pacienteId))
+                .thenReturn(List.of(novoAgendamento(medicoId, pacienteId, StatusAgendamento.PENDENTE, TipoAgendamento.PRESENCIAL)));
+
+        var resultado = service.listar(pacienteId, null, null);
+
+        assertThat(resultado).hasSize(1);
+        verify(agendamentoRepository, never()).findAllByMedicoId(any());
     }
 
     @Test
