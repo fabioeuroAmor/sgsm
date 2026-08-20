@@ -133,6 +133,21 @@ class FuncionarioServiceTest {
         verify(repository, never()).save(any());
     }
 
+    @Test
+    void deveLancarExcecaoAoCadastrarComEmailDuplicado() {
+        UUID estabId = UUID.randomUUID();
+        var request = new CadastrarFuncionarioRequest("X", "123.456.789-00", "duplicado@email.com", null, "Aux", estabId);
+        when(estabelecimentoRepository.existsById(estabId)).thenReturn(true);
+        when(contextoSeguranca.isMedico()).thenReturn(false);
+        when(repository.existsByCpf("123.456.789-00")).thenReturn(false);
+        when(repository.existsByEmail("duplicado@email.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.cadastrar(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicado@email.com");
+        verify(repository, never()).save(any());
+    }
+
     // ─── consultar ───────────────────────────────────────────────────────────
 
     @Test
