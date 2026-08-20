@@ -10,6 +10,7 @@ public interface FuncionarioRepository extends JpaRepository<Funcionario, UUID> 
 
     boolean existsByCpf(String cpf);
     boolean existsByCpfAndIdNot(String cpf, UUID id);
+    boolean existsByEmail(String email);
     boolean existsByEmailAndIdNot(String email, UUID id);
 
     List<Funcionario> findAllByEstabelecimentoId(UUID estabelecimentoId);
