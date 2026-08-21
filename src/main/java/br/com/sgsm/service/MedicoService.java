@@ -78,6 +78,10 @@ public class MedicoService {
     }
 
     public void remover(UUID id) {
+        UUID ref = contextoSeguranca.getReferenciaId();
+        if (contextoSeguranca.isMedico() && !id.equals(ref)) {
+            throw new AcessoNegadoException("Médico não pode inativar outro médico: " + id);
+        }
         var medico = buscarOuLancarErro(id);
         medico.setAtivo(false);
         repository.save(medico);
