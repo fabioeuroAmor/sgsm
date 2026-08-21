@@ -40,6 +40,8 @@ public class SecurityConfig {
                     .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers(HttpMethod.DELETE, "/v1/api/medicos/**")
                     .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                .requestMatchers(HttpMethod.PATCH, "/v1/api/medicos/**")
+                    .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 // Pacientes: leitura para todos os roles; escrita apenas para PACIENTE (próprios dados), FUNCIONARIO e DESENVOLVEDOR
                 .requestMatchers(HttpMethod.GET, "/v1/api/pacientes/**")
                     .hasAnyRole("PACIENTE", "MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")

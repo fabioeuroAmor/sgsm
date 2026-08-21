@@ -232,6 +232,60 @@ class MedicoServiceTest {
     }
 
     @Test
+    void deveReativarMedicoQuandoNaoForMedicoAutenticado() {
+        UUID id = UUID.randomUUID();
+        var medico = novoMedico();
+        medico.setAtivo(false);
+        when(contextoSeguranca.isMedico()).thenReturn(false);
+        when(repository.findById(id)).thenReturn(Optional.of(medico));
+        when(repository.save(medico)).thenReturn(medico);
+
+        var response = service.reativar(id);
+
+        assertThat(medico.getAtivo()).isTrue();
+        assertThat(response.getAtivo()).isTrue();
+        verify(repository).save(medico);
+    }
+
+    @Test
+    void devePermitirMedicoReativarASiMesmo() {
+        UUID id = UUID.randomUUID();
+        var medico = novoMedico();
+        medico.setAtivo(false);
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(id);
+        when(repository.findById(id)).thenReturn(Optional.of(medico));
+        when(repository.save(medico)).thenReturn(medico);
+
+        var response = service.reativar(id);
+
+        assertThat(medico.getAtivo()).isTrue();
+        assertThat(response.getAtivo()).isTrue();
+        verify(repository).save(medico);
+    }
+
+    @Test
+    void deveNegarReativacaoQuandoMedicoReativaOutroMedico() {
+        UUID id = UUID.randomUUID();
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+
+        assertThatThrownBy(() -> service.reativar(id))
+                .isInstanceOf(AcessoNegadoException.class);
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void deveLancarExcecaoAoReativarMedicoInexistente() {
+        UUID id = UUID.randomUUID();
+        when(contextoSeguranca.isMedico()).thenReturn(false);
+        when(repository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.reativar(id))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
     void deveLancarExcecaoAoRemoverMedicoInexistente() {
         UUID id = UUID.randomUUID();
         when(contextoSeguranca.isMedico()).thenReturn(false);
