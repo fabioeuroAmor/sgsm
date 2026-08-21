@@ -128,6 +128,15 @@ public class FuncionarioService {
         repository.save(funcionario);
     }
 
+    public FuncionarioResponse reativar(UUID id) {
+        var funcionario = buscarOuLancarErro(id);
+        if (contextoSeguranca.isMedico()) {
+            validarEstabelecimentoDoMedico(funcionario.getEstabelecimentoId());
+        }
+        funcionario.setAtivo(true);
+        return modelMapper.map(repository.save(funcionario), FuncionarioResponse.class);
+    }
+
     private Funcionario buscarOuLancarErro(UUID id) {
         return repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Funcionário não encontrado: " + id));
