@@ -203,6 +203,59 @@ class ServicoMedicoServiceTest {
     }
 
     @Test
+    void deveReativarServicoQuandoNaoForMedicoAutenticado() {
+        var servico = novoServico();
+        servico.setAtivo(false);
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(repository.save(servico)).thenReturn(servico);
+
+        var response = service.reativar(id);
+
+        assertThat(servico.getAtivo()).isTrue();
+        assertThat(response.getAtivo()).isTrue();
+        verify(repository).save(servico);
+    }
+
+    @Test
+    void devePermitirMedicoReativarProprioServico() {
+        var servico = novoServico();
+        servico.setAtivo(false);
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(repository.save(servico)).thenReturn(servico);
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(servico.getMedicoId());
+
+        var response = service.reativar(id);
+
+        assertThat(servico.getAtivo()).isTrue();
+        assertThat(response.getAtivo()).isTrue();
+    }
+
+    @Test
+    void deveNegarReativacaoQuandoMedicoReativaServicoDeOutroMedico() {
+        var servico = novoServico();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+
+        assertThatThrownBy(() -> service.reativar(id))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deveLancarExcecaoAoReativarServicoMedicoInexistente() {
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.reativar(id))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
     void deveListarPorMedicoEAtivoQuandoAmbosInformados() {
         UUID medicoId = UUID.randomUUID();
         when(repository.findAllByMedicoIdAndAtivo(medicoId, true)).thenReturn(List.of(novoServico()));

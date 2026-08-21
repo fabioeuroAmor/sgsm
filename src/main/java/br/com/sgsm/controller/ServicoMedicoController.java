@@ -48,6 +48,12 @@ public class ServicoMedicoController {
         return ResponseEntity.noContent().build();
     }
 
+    // UC06 - Reativar serviço médico
+    @PatchMapping("/{id}/reativar")
+    public ResponseEntity<ServicoMedicoResponse> reativar(@PathVariable UUID id) {
+        return ResponseEntity.ok(service.reativar(id));
+    }
+
     // UC05 - Listar serviços médicos
     @GetMapping
     public ResponseEntity<List<ServicoMedicoResponse>> listar(

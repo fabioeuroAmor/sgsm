@@ -63,6 +63,14 @@ public class ServicoMedicoService {
         repository.save(servico);
     }
 
+    public ServicoMedicoResponse reativar(UUID id) {
+        var servico = buscarOuLancarErro(id);
+        verificarPosse(servico.getMedicoId());
+        servico.setAtivo(true);
+        var salvo = repository.save(servico);
+        return modelMapper.map(salvo, ServicoMedicoResponse.class);
+    }
+
     private void verificarPosse(UUID medicoId) {
         UUID ref = contextoSeguranca.getReferenciaId();
         if (contextoSeguranca.isMedico() && !medicoId.equals(ref)) {
