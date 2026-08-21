@@ -80,6 +80,18 @@ class FuncionarioControllerTest {
     }
 
     @Test
+    void deveRetornar200AoReativar() {
+        UUID id = UUID.randomUUID();
+        var resposta = new FuncionarioResponse();
+        when(service.reativar(id)).thenReturn(resposta);
+
+        var response = controller.reativar(id);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(resposta);
+    }
+
+    @Test
     void deveRetornar200ComListaAoListar() {
         UUID estabelecimentoId = UUID.randomUUID();
         var resposta = new FuncionarioResponse();
