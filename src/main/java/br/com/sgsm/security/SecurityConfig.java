@@ -56,7 +56,7 @@ public class SecurityConfig {
                 // Agendamentos: todos autenticados; segregacao feita no Service
                 .requestMatchers("/v1/api/agendamentos/**").authenticated()
                 // Agenda e servicos
-                .requestMatchers("/v1/api/agenda/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                .requestMatchers("/v1/api/agenda-medico/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers("/v1/api/servicos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers("/v1/api/estabelecimentos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 // Funcionarios: MEDICO gerencia apenas funcionarios dos seus estabelecimentos
