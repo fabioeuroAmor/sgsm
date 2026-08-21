@@ -72,15 +72,32 @@ class JwtAuthFilterTest {
     }
 
     @Test
-    void deveSeguirCadeiaSemAutenticarQuandoTokenInvalido() throws Exception {
+    void deveResponder401SemSeguirCadeiaQuandoTokenInvalido() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token-invalido");
         when(jwtService.tokenValido("token-invalido")).thenReturn(false);
         filter = criarFiltro();
 
         filter.doFilterInternal(request, response, chain);
 
-        verify(chain).doFilter(request, response);
+        verify(response).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), any());
+        verifyNoInteractions(chain);
         verify(jwtService, never()).extrairClaims(any());
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    @Test
+    void deveResponder401SemSeguirCadeiaQuandoTokenRevogado() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Bearer token-revogado");
+        when(jwtService.tokenValido("token-revogado")).thenReturn(true);
+        when(jwtService.extrairClaims("token-revogado")).thenReturn(claims);
+        when(claims.getId()).thenReturn("jti-123");
+        when(redis.hasKey("blacklist:jti-123")).thenReturn(true);
+        filter = criarFiltro();
+
+        filter.doFilterInternal(request, response, chain);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), any());
+        verifyNoInteractions(chain);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 
