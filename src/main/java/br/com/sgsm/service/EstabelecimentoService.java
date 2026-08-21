@@ -73,7 +73,16 @@ public class EstabelecimentoService {
     public void remover(UUID id) {
         var estabelecimento = buscarOuLancarErro(id);
         estabelecimento.setAtivo(false);
-        repository.save(estabelecimento);
+        var salvo = repository.save(estabelecimento);
+        vetorizacaoPublisher.publicar("ESTABELECIMENTO", salvo.getId().toString(), "UPDATE");
+    }
+
+    public EstabelecimentoResponse reativar(UUID id) {
+        var estabelecimento = buscarOuLancarErro(id);
+        estabelecimento.setAtivo(true);
+        var salvo = repository.save(estabelecimento);
+        vetorizacaoPublisher.publicar("ESTABELECIMENTO", salvo.getId().toString(), "UPDATE");
+        return modelMapper.map(salvo, EstabelecimentoResponse.class);
     }
 
     @Transactional(readOnly = true)
