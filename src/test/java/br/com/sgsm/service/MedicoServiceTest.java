@@ -44,6 +44,7 @@ class MedicoServiceTest {
 
     private Medico novoMedico() {
         var m = new Medico();
+        ReflectionTestUtils.setField(m, "id", UUID.randomUUID());
         m.setNome("Dra. Ana Souza");
         m.setCrm("12345");
         m.setCrmUf("sp");
@@ -199,6 +200,7 @@ class MedicoServiceTest {
         var medico = novoMedico();
         when(contextoSeguranca.isMedico()).thenReturn(false);
         when(repository.findById(id)).thenReturn(Optional.of(medico));
+        when(repository.save(medico)).thenReturn(medico);
 
         service.remover(id);
 
@@ -213,6 +215,7 @@ class MedicoServiceTest {
         when(contextoSeguranca.isMedico()).thenReturn(true);
         when(contextoSeguranca.getReferenciaId()).thenReturn(id);
         when(repository.findById(id)).thenReturn(Optional.of(medico));
+        when(repository.save(medico)).thenReturn(medico);
 
         service.remover(id);
 

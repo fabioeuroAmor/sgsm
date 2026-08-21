@@ -50,6 +50,7 @@ class PacienteServiceTest {
 
     private Paciente novoPaciente() {
         var p = new Paciente();
+        ReflectionTestUtils.setField(p, "id", UUID.randomUUID());
         p.setNome("João Silva");
         p.setCpf("12345678900");
         p.setDataNascimento(LocalDate.of(1990, 1, 1));
@@ -223,6 +224,7 @@ class PacienteServiceTest {
         UUID id = UUID.randomUUID();
         var paciente = novoPaciente();
         when(repository.findById(id)).thenReturn(Optional.of(paciente));
+        when(repository.save(paciente)).thenReturn(paciente);
 
         service.remover(id);
 

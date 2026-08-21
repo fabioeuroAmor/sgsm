@@ -44,6 +44,7 @@ class ServicoMedicoServiceTest {
 
     private ServicoMedico novoServico() {
         var s = new ServicoMedico();
+        ReflectionTestUtils.setField(s, "id", UUID.randomUUID());
         s.setMedicoId(UUID.randomUUID());
         s.setNome("Consulta cardiológica");
         s.setPreco(new BigDecimal("250.00"));
@@ -159,6 +160,7 @@ class ServicoMedicoServiceTest {
         var servico = novoServico();
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(repository.save(servico)).thenReturn(servico);
 
         service.remover(id);
 
@@ -171,6 +173,7 @@ class ServicoMedicoServiceTest {
         var servico = novoServico();
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(repository.save(servico)).thenReturn(servico);
         when(contextoSeguranca.isMedico()).thenReturn(true);
         when(contextoSeguranca.getReferenciaId()).thenReturn(servico.getMedicoId());
 

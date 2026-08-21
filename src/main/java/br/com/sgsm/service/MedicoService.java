@@ -84,7 +84,8 @@ public class MedicoService {
         }
         var medico = buscarOuLancarErro(id);
         medico.setAtivo(false);
-        repository.save(medico);
+        var salvo = repository.save(medico);
+        vetorizacaoPublisher.publicar("MEDICO", salvo.getId().toString(), "UPDATE");
     }
 
     public MedicoResponse reativar(UUID id) {
@@ -95,6 +96,7 @@ public class MedicoService {
         var medico = buscarOuLancarErro(id);
         medico.setAtivo(true);
         var salvo = repository.save(medico);
+        vetorizacaoPublisher.publicar("MEDICO", salvo.getId().toString(), "UPDATE");
         return modelMapper.map(salvo, MedicoResponse.class);
     }
 
