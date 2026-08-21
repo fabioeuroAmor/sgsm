@@ -102,6 +102,14 @@ public class PacienteService {
         repository.save(paciente);
     }
 
+    // UC - Reativar paciente
+    public PacienteResponse reativar(UUID id) {
+        var paciente = buscarOuLancarErro(id);
+        paciente.setAtivo(true);
+        var salvo = repository.save(paciente);
+        return modelMapper.map(salvo, PacienteResponse.class);
+    }
+
     // UC - Listar pacientes
     @Transactional(readOnly = true)
     public List<PacienteResponse> listar(Boolean ativo) {

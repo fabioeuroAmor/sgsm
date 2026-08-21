@@ -49,6 +49,8 @@ public class SecurityConfig {
                     .hasAnyRole("PACIENTE", "FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers(HttpMethod.DELETE, "/v1/api/pacientes/**")
                     .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR")
+                .requestMatchers(HttpMethod.PATCH, "/v1/api/pacientes/**")
+                    .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR")
                 // Agendamentos: todos autenticados; segregacao feita no Service
                 .requestMatchers("/v1/api/agendamentos/**").authenticated()
                 // Agenda e servicos

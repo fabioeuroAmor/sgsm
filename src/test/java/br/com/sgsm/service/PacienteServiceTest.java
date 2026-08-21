@@ -240,6 +240,30 @@ class PacienteServiceTest {
     }
 
     @Test
+    void deveReativarPaciente() {
+        UUID id = UUID.randomUUID();
+        var paciente = novoPaciente();
+        paciente.setAtivo(false);
+        when(repository.findById(id)).thenReturn(Optional.of(paciente));
+        when(repository.save(paciente)).thenReturn(paciente);
+
+        var response = service.reativar(id);
+
+        assertThat(paciente.getAtivo()).isTrue();
+        assertThat(response.getAtivo()).isTrue();
+        verify(repository).save(paciente);
+    }
+
+    @Test
+    void deveLancarExcecaoAoReativarPacienteInexistente() {
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.reativar(id))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
     void deveListarApenasProprioPacienteQuandoAutenticadoComoPaciente() {
         UUID id = UUID.randomUUID();
         when(contextoSeguranca.isPaciente()).thenReturn(true);
