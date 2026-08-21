@@ -4,7 +4,9 @@ import br.com.sgsm.domain.ServicoMedico;
 import br.com.sgsm.dto.AtualizarServicoMedicoRequest;
 import br.com.sgsm.dto.CadastrarServicoMedicoRequest;
 import br.com.sgsm.events.VetorizacaoPublisher;
+import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
+import br.com.sgsm.security.ContextoSeguranca;
 import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.repository.ServicoMedicoRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,12 +32,14 @@ class ServicoMedicoServiceTest {
     private ServicoMedicoRepository repository;
     @Mock
     private VetorizacaoPublisher vetorizacaoPublisher;
+    @Mock
+    private ContextoSeguranca contextoSeguranca;
 
     private ServicoMedicoService service;
 
     @BeforeEach
     void setUp() {
-        service = new ServicoMedicoService(repository, new br.com.sgsm.config.ModelMapperConfig().modelMapper(), vetorizacaoPublisher);
+        service = new ServicoMedicoService(repository, new br.com.sgsm.config.ModelMapperConfig().modelMapper(), vetorizacaoPublisher, contextoSeguranca);
     }
 
     private ServicoMedico novoServico() {
@@ -108,6 +112,39 @@ class ServicoMedicoServiceTest {
     }
 
     @Test
+    void devePermitirMedicoAtualizarProprioServico() {
+        var servico = novoServico();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(repository.save(any(ServicoMedico.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(servico.getMedicoId());
+        var request = new AtualizarServicoMedicoRequest("Novo nome", null, null, null, null, null);
+
+        var response = service.atualizar(id, request);
+
+        assertThat(response.getNome()).isEqualTo("Novo nome");
+    }
+
+    @Test
+    void deveNegarAtualizacaoQuandoMedicoAtualizaServicoDeOutroMedico() {
+        var servico = novoServico();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+        var request = new AtualizarServicoMedicoRequest("x", null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.atualizar(id, request))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void deveLancarExcecaoAoAtualizarServicoMedicoInexistente() {
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.empty());
@@ -127,6 +164,33 @@ class ServicoMedicoServiceTest {
 
         assertThat(servico.getAtivo()).isFalse();
         verify(repository).save(servico);
+    }
+
+    @Test
+    void devePermitirMedicoRemoverProprioServico() {
+        var servico = novoServico();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(servico.getMedicoId());
+
+        service.remover(id);
+
+        assertThat(servico.getAtivo()).isFalse();
+        verify(repository).save(servico);
+    }
+
+    @Test
+    void deveNegarRemocaoQuandoMedicoRemoveServicoDeOutroMedico() {
+        var servico = novoServico();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+
+        assertThatThrownBy(() -> service.remover(id))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(repository, never()).save(any());
     }
 
     @Test
