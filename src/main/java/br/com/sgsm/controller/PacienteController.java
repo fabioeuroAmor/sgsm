@@ -48,6 +48,12 @@ public class PacienteController {
         return ResponseEntity.noContent().build();
     }
 
+    // UC - Reativar paciente
+    @PatchMapping("/{id}/reativar")
+    public ResponseEntity<PacienteResponse> reativar(@PathVariable UUID id) {
+        return ResponseEntity.ok(service.reativar(id));
+    }
+
     // UC - Listar pacientes
     @GetMapping
     public ResponseEntity<List<PacienteResponse>> listar(
