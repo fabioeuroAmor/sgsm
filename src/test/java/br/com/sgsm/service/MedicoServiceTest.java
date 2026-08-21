@@ -197,6 +197,7 @@ class MedicoServiceTest {
     void deveInativarMedicoAoRemover() {
         UUID id = UUID.randomUUID();
         var medico = novoMedico();
+        when(contextoSeguranca.isMedico()).thenReturn(false);
         when(repository.findById(id)).thenReturn(Optional.of(medico));
 
         service.remover(id);
@@ -206,8 +207,34 @@ class MedicoServiceTest {
     }
 
     @Test
+    void devePermitirMedicoRemoverASiMesmo() {
+        UUID id = UUID.randomUUID();
+        var medico = novoMedico();
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(id);
+        when(repository.findById(id)).thenReturn(Optional.of(medico));
+
+        service.remover(id);
+
+        assertThat(medico.getAtivo()).isFalse();
+        verify(repository).save(medico);
+    }
+
+    @Test
+    void deveNegarRemocaoQuandoMedicoRemoveOutroMedico() {
+        UUID id = UUID.randomUUID();
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+
+        assertThatThrownBy(() -> service.remover(id))
+                .isInstanceOf(AcessoNegadoException.class);
+        verifyNoInteractions(repository);
+    }
+
+    @Test
     void deveLancarExcecaoAoRemoverMedicoInexistente() {
         UUID id = UUID.randomUUID();
+        when(contextoSeguranca.isMedico()).thenReturn(false);
         when(repository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.remover(id))
