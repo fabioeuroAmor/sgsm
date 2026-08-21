@@ -5,10 +5,12 @@ import br.com.sgsm.domain.DiaSemana;
 import br.com.sgsm.domain.Estabelecimento;
 import br.com.sgsm.domain.Medico;
 import br.com.sgsm.dto.CadastrarAgendaMedicoRequest;
+import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.AgendaMedicoRepository;
 import br.com.sgsm.repository.EstabelecimentoRepository;
 import br.com.sgsm.repository.MedicoRepository;
+import br.com.sgsm.security.ContextoSeguranca;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,12 +36,14 @@ class AgendaMedicoServiceTest {
     private MedicoRepository medicoRepository;
     @Mock
     private EstabelecimentoRepository estabelecimentoRepository;
+    @Mock
+    private ContextoSeguranca contextoSeguranca;
 
     private AgendaMedicoService service;
 
     @BeforeEach
     void setUp() {
-        service = new AgendaMedicoService(agendaMedicoRepository, medicoRepository, estabelecimentoRepository);
+        service = new AgendaMedicoService(agendaMedicoRepository, medicoRepository, estabelecimentoRepository, contextoSeguranca);
     }
 
     private CadastrarAgendaMedicoRequest requestPresencial(UUID medicoId, UUID estabelecimentoId) {
@@ -87,6 +91,30 @@ class AgendaMedicoServiceTest {
     }
 
     @Test
+    void devePermitirMedicoListarPropriaAgenda() {
+        UUID medicoId = UUID.randomUUID();
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(medicoId);
+        when(agendaMedicoRepository.findByMedicoIdOrderByDiaSemanaAscHoraInicioAsc(medicoId))
+                .thenReturn(List.of());
+
+        var resultado = service.listar(medicoId);
+
+        assertThat(resultado).isEmpty();
+    }
+
+    @Test
+    void deveNegarListagemQuandoMedicoListaAgendaDeOutroMedico() {
+        UUID medicoId = UUID.randomUUID();
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+
+        assertThatThrownBy(() -> service.listar(medicoId))
+                .isInstanceOf(AcessoNegadoException.class);
+        verifyNoInteractions(agendaMedicoRepository);
+    }
+
+    @Test
     void deveCadastrarAgendaPresencialQuandoDadosValidos() {
         UUID medicoId = UUID.randomUUID();
         UUID estabelecimentoId = UUID.randomUUID();
@@ -115,6 +143,17 @@ class AgendaMedicoServiceTest {
         assertThat(response.getDomiciliar()).isTrue();
         assertThat(response.getEstabelecimentoId()).isNull();
         verifyNoInteractions(estabelecimentoRepository);
+    }
+
+    @Test
+    void deveNegarCadastroQuandoMedicoCadastraAgendaParaOutroMedico() {
+        UUID medicoId = UUID.randomUUID();
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+
+        assertThatThrownBy(() -> service.cadastrar(requestPresencial(medicoId, UUID.randomUUID())))
+                .isInstanceOf(AcessoNegadoException.class);
+        verifyNoInteractions(medicoRepository);
     }
 
     @Test
@@ -213,5 +252,36 @@ class AgendaMedicoServiceTest {
 
         assertThatThrownBy(() -> service.remover(id))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void devePermitirMedicoRemoverPropriaAgenda() {
+        UUID id = UUID.randomUUID();
+        UUID medicoId = UUID.randomUUID();
+        var agenda = new AgendaMedico();
+        agenda.setMedicoId(medicoId);
+        when(agendaMedicoRepository.findById(id)).thenReturn(Optional.of(agenda));
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(medicoId);
+
+        service.remover(id);
+
+        assertThat(agenda.getAtivo()).isFalse();
+        verify(agendaMedicoRepository).save(agenda);
+    }
+
+    @Test
+    void deveNegarRemocaoQuandoMedicoRemoveAgendaDeOutroMedico() {
+        UUID id = UUID.randomUUID();
+        UUID medicoId = UUID.randomUUID();
+        var agenda = new AgendaMedico();
+        agenda.setMedicoId(medicoId);
+        when(agendaMedicoRepository.findById(id)).thenReturn(Optional.of(agenda));
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+
+        assertThatThrownBy(() -> service.remover(id))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(agendaMedicoRepository, never()).save(any());
     }
 }

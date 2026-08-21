@@ -3,10 +3,12 @@ package br.com.sgsm.service;
 import br.com.sgsm.domain.AgendaMedico;
 import br.com.sgsm.dto.AgendaMedicoResponse;
 import br.com.sgsm.dto.CadastrarAgendaMedicoRequest;
+import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.AgendaMedicoRepository;
 import br.com.sgsm.repository.EstabelecimentoRepository;
 import br.com.sgsm.repository.MedicoRepository;
+import br.com.sgsm.security.ContextoSeguranca;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,18 +23,22 @@ public class AgendaMedicoService {
     private final AgendaMedicoRepository agendaMedicoRepository;
     private final MedicoRepository medicoRepository;
     private final EstabelecimentoRepository estabelecimentoRepository;
+    private final ContextoSeguranca contextoSeguranca;
 
     public AgendaMedicoService(
             AgendaMedicoRepository agendaMedicoRepository,
             MedicoRepository medicoRepository,
-            EstabelecimentoRepository estabelecimentoRepository) {
+            EstabelecimentoRepository estabelecimentoRepository,
+            ContextoSeguranca contextoSeguranca) {
         this.agendaMedicoRepository = agendaMedicoRepository;
         this.medicoRepository = medicoRepository;
         this.estabelecimentoRepository = estabelecimentoRepository;
+        this.contextoSeguranca = contextoSeguranca;
     }
 
     @Transactional(readOnly = true)
     public List<AgendaMedicoResponse> listar(UUID medicoId) {
+        verificarPosse(medicoId);
         return agendaMedicoRepository
                 .findByMedicoIdOrderByDiaSemanaAscHoraInicioAsc(medicoId)
                 .stream()
@@ -41,6 +47,7 @@ public class AgendaMedicoService {
     }
 
     public AgendaMedicoResponse cadastrar(CadastrarAgendaMedicoRequest request) {
+        verificarPosse(request.medicoId());
         medicoRepository.findById(request.medicoId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Médico não encontrado: " + request.medicoId()));
 
@@ -84,8 +91,16 @@ public class AgendaMedicoService {
     public void remover(UUID id) {
         var agenda = agendaMedicoRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Agenda não encontrada: " + id));
+        verificarPosse(agenda.getMedicoId());
         agenda.setAtivo(false);
         agendaMedicoRepository.save(agenda);
+    }
+
+    private void verificarPosse(UUID medicoId) {
+        UUID ref = contextoSeguranca.getReferenciaId();
+        if (contextoSeguranca.isMedico() && !medicoId.equals(ref)) {
+            throw new AcessoNegadoException("Médico não pode gerenciar agenda de outro médico: " + medicoId);
+        }
     }
 
     private AgendaMedicoResponse toResponse(AgendaMedico a) {
