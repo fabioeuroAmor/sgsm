@@ -60,7 +60,8 @@ public class ServicoMedicoService {
         var servico = buscarOuLancarErro(id);
         verificarPosse(servico.getMedicoId());
         servico.setAtivo(false);
-        repository.save(servico);
+        var salvo = repository.save(servico);
+        vetorizacaoPublisher.publicar("SERVICO_MEDICO", salvo.getId().toString(), "UPDATE");
     }
 
     public ServicoMedicoResponse reativar(UUID id) {
@@ -68,6 +69,7 @@ public class ServicoMedicoService {
         verificarPosse(servico.getMedicoId());
         servico.setAtivo(true);
         var salvo = repository.save(servico);
+        vetorizacaoPublisher.publicar("SERVICO_MEDICO", salvo.getId().toString(), "UPDATE");
         return modelMapper.map(salvo, ServicoMedicoResponse.class);
     }
 

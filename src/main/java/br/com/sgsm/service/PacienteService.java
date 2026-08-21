@@ -99,7 +99,8 @@ public class PacienteService {
     public void remover(UUID id) {
         var paciente = buscarOuLancarErro(id);
         paciente.setAtivo(false);
-        repository.save(paciente);
+        var salvo = repository.save(paciente);
+        vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
     }
 
     // UC - Reativar paciente
@@ -107,6 +108,7 @@ public class PacienteService {
         var paciente = buscarOuLancarErro(id);
         paciente.setAtivo(true);
         var salvo = repository.save(paciente);
+        vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
         return modelMapper.map(salvo, PacienteResponse.class);
     }
 
