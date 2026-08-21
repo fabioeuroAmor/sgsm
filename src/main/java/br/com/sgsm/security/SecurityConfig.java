@@ -28,6 +28,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Swagger
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                // /error precisa ser liberado: response.sendError() no JwtAuthFilter dispara um
+                // forward interno pra cá, que reentra na cadeia de segurança sem token válido —
+                // sem isso, o forward era barrado com 403 e sobrescrevia o 401 original.
+                .requestMatchers("/error").permitAll()
                 // Auto-cadastro publico: novo medico/paciente cria seu perfil antes de autenticar
                 .requestMatchers(HttpMethod.POST, "/v1/api/medicos").permitAll()
                 .requestMatchers(HttpMethod.POST, "/v1/api/pacientes").permitAll()
