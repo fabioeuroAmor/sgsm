@@ -87,6 +87,17 @@ public class MedicoService {
         repository.save(medico);
     }
 
+    public MedicoResponse reativar(UUID id) {
+        UUID ref = contextoSeguranca.getReferenciaId();
+        if (contextoSeguranca.isMedico() && !id.equals(ref)) {
+            throw new AcessoNegadoException("Médico não pode reativar outro médico: " + id);
+        }
+        var medico = buscarOuLancarErro(id);
+        medico.setAtivo(true);
+        var salvo = repository.save(medico);
+        return modelMapper.map(salvo, MedicoResponse.class);
+    }
+
     @Transactional(readOnly = true)
     public List<MedicoResponse> listar(Boolean ativo, String especialidade) {
         List<Medico> resultado;
