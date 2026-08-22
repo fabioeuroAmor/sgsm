@@ -79,6 +79,18 @@ class EstabelecimentoControllerTest {
     }
 
     @Test
+    void deveRetornar200AoReativar() {
+        UUID id = UUID.randomUUID();
+        var resposta = new EstabelecimentoResponse();
+        when(service.reativar(id)).thenReturn(resposta);
+
+        var response = controller.reativar(id);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(resposta);
+    }
+
+    @Test
     void deveRetornar200ComListaAoListar() {
         var resposta = new EstabelecimentoResponse();
         when(service.listar(true, "SP", "São Paulo", null)).thenReturn(List.of(resposta));

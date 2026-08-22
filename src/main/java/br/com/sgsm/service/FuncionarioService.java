@@ -50,6 +50,9 @@ public class FuncionarioService {
         if (repository.existsByCpf(request.cpf())) {
             throw new IllegalArgumentException("CPF já cadastrado: " + request.cpf());
         }
+        if (repository.existsByEmail(request.email())) {
+            throw new IllegalArgumentException("E-mail já cadastrado: " + request.email());
+        }
 
         var funcionario = modelMapper.map(request, Funcionario.class);
         return modelMapper.map(repository.save(funcionario), FuncionarioResponse.class);
@@ -123,6 +126,15 @@ public class FuncionarioService {
         }
         funcionario.setAtivo(false);
         repository.save(funcionario);
+    }
+
+    public FuncionarioResponse reativar(UUID id) {
+        var funcionario = buscarOuLancarErro(id);
+        if (contextoSeguranca.isMedico()) {
+            validarEstabelecimentoDoMedico(funcionario.getEstabelecimentoId());
+        }
+        funcionario.setAtivo(true);
+        return modelMapper.map(repository.save(funcionario), FuncionarioResponse.class);
     }
 
     private Funcionario buscarOuLancarErro(UUID id) {

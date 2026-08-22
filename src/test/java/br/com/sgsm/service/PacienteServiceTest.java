@@ -50,6 +50,7 @@ class PacienteServiceTest {
 
     private Paciente novoPaciente() {
         var p = new Paciente();
+        ReflectionTestUtils.setField(p, "id", UUID.randomUUID());
         p.setNome("João Silva");
         p.setCpf("12345678900");
         p.setDataNascimento(LocalDate.of(1990, 1, 1));
@@ -71,7 +72,7 @@ class PacienteServiceTest {
             ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
             return e;
         });
-        var request = new CadastrarPacienteRequest("João Silva", "12345678900",
+        var request = new CadastrarPacienteRequest("João Silva", "52998224725",
                 LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
 
         var response = service.cadastrar(request);
@@ -80,22 +81,33 @@ class PacienteServiceTest {
     }
 
     @Test
-    void deveLancarExcecaoQuandoCpfJaCadastrado() {
-        when(repository.existsByCpf("12345678900")).thenReturn(true);
-        var request = new CadastrarPacienteRequest("João Silva", "12345678900",
+    void deveLancarExcecaoQuandoCpfInvalido() {
+        var request = new CadastrarPacienteRequest("João Silva", "11111111111",
                 LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> service.cadastrar(request))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("12345678900");
+                .hasMessageContaining("CPF inválido");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deveLancarExcecaoQuandoCpfJaCadastrado() {
+        when(repository.existsByCpf("52998224725")).thenReturn(true);
+        var request = new CadastrarPacienteRequest("João Silva", "52998224725",
+                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.cadastrar(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("52998224725");
         verify(repository, never()).save(any());
     }
 
     @Test
     void deveLancarExcecaoQuandoEmailJaCadastrado() {
-        when(repository.existsByCpf("12345678900")).thenReturn(false);
+        when(repository.existsByCpf("52998224725")).thenReturn(false);
         when(repository.existsByEmail("joao@sgsm.com.br")).thenReturn(true);
-        var request = new CadastrarPacienteRequest("João Silva", "12345678900",
+        var request = new CadastrarPacienteRequest("João Silva", "52998224725",
                 LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> service.cadastrar(request))
@@ -212,6 +224,7 @@ class PacienteServiceTest {
         UUID id = UUID.randomUUID();
         var paciente = novoPaciente();
         when(repository.findById(id)).thenReturn(Optional.of(paciente));
+        when(repository.save(paciente)).thenReturn(paciente);
 
         service.remover(id);
 
@@ -225,6 +238,30 @@ class PacienteServiceTest {
         when(repository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.remover(id))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void deveReativarPaciente() {
+        UUID id = UUID.randomUUID();
+        var paciente = novoPaciente();
+        paciente.setAtivo(false);
+        when(repository.findById(id)).thenReturn(Optional.of(paciente));
+        when(repository.save(paciente)).thenReturn(paciente);
+
+        var response = service.reativar(id);
+
+        assertThat(paciente.getAtivo()).isTrue();
+        assertThat(response.getAtivo()).isTrue();
+        verify(repository).save(paciente);
+    }
+
+    @Test
+    void deveLancarExcecaoAoReativarPacienteInexistente() {
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.reativar(id))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 

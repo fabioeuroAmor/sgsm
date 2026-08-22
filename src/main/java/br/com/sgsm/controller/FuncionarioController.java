@@ -43,6 +43,11 @@ public class FuncionarioController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/{id}/reativar")
+    public ResponseEntity<FuncionarioResponse> reativar(@PathVariable UUID id) {
+        return ResponseEntity.ok(service.reativar(id));
+    }
+
     @GetMapping
     public ResponseEntity<List<FuncionarioResponse>> listar(
             @RequestParam(required = false) UUID estabelecimentoId,

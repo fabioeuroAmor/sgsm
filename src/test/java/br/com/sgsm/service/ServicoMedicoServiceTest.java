@@ -4,7 +4,9 @@ import br.com.sgsm.domain.ServicoMedico;
 import br.com.sgsm.dto.AtualizarServicoMedicoRequest;
 import br.com.sgsm.dto.CadastrarServicoMedicoRequest;
 import br.com.sgsm.events.VetorizacaoPublisher;
+import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
+import br.com.sgsm.security.ContextoSeguranca;
 import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.repository.ServicoMedicoRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,16 +32,19 @@ class ServicoMedicoServiceTest {
     private ServicoMedicoRepository repository;
     @Mock
     private VetorizacaoPublisher vetorizacaoPublisher;
+    @Mock
+    private ContextoSeguranca contextoSeguranca;
 
     private ServicoMedicoService service;
 
     @BeforeEach
     void setUp() {
-        service = new ServicoMedicoService(repository, new br.com.sgsm.config.ModelMapperConfig().modelMapper(), vetorizacaoPublisher);
+        service = new ServicoMedicoService(repository, new br.com.sgsm.config.ModelMapperConfig().modelMapper(), vetorizacaoPublisher, contextoSeguranca);
     }
 
     private ServicoMedico novoServico() {
         var s = new ServicoMedico();
+        ReflectionTestUtils.setField(s, "id", UUID.randomUUID());
         s.setMedicoId(UUID.randomUUID());
         s.setNome("Consulta cardiológica");
         s.setPreco(new BigDecimal("250.00"));
@@ -108,6 +113,39 @@ class ServicoMedicoServiceTest {
     }
 
     @Test
+    void devePermitirMedicoAtualizarProprioServico() {
+        var servico = novoServico();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(repository.save(any(ServicoMedico.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(servico.getMedicoId());
+        var request = new AtualizarServicoMedicoRequest("Novo nome", null, null, null, null, null);
+
+        var response = service.atualizar(id, request);
+
+        assertThat(response.getNome()).isEqualTo("Novo nome");
+    }
+
+    @Test
+    void deveNegarAtualizacaoQuandoMedicoAtualizaServicoDeOutroMedico() {
+        var servico = novoServico();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+        var request = new AtualizarServicoMedicoRequest("x", null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.atualizar(id, request))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void deveLancarExcecaoAoAtualizarServicoMedicoInexistente() {
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.empty());
@@ -122,6 +160,7 @@ class ServicoMedicoServiceTest {
         var servico = novoServico();
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(repository.save(servico)).thenReturn(servico);
 
         service.remover(id);
 
@@ -130,11 +169,92 @@ class ServicoMedicoServiceTest {
     }
 
     @Test
+    void devePermitirMedicoRemoverProprioServico() {
+        var servico = novoServico();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(repository.save(servico)).thenReturn(servico);
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(servico.getMedicoId());
+
+        service.remover(id);
+
+        assertThat(servico.getAtivo()).isFalse();
+        verify(repository).save(servico);
+    }
+
+    @Test
+    void deveNegarRemocaoQuandoMedicoRemoveServicoDeOutroMedico() {
+        var servico = novoServico();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+
+        assertThatThrownBy(() -> service.remover(id))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void deveLancarExcecaoAoRemoverServicoMedicoInexistente() {
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.remover(id))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void deveReativarServicoQuandoNaoForMedicoAutenticado() {
+        var servico = novoServico();
+        servico.setAtivo(false);
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(repository.save(servico)).thenReturn(servico);
+
+        var response = service.reativar(id);
+
+        assertThat(servico.getAtivo()).isTrue();
+        assertThat(response.getAtivo()).isTrue();
+        verify(repository).save(servico);
+    }
+
+    @Test
+    void devePermitirMedicoReativarProprioServico() {
+        var servico = novoServico();
+        servico.setAtivo(false);
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(repository.save(servico)).thenReturn(servico);
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(servico.getMedicoId());
+
+        var response = service.reativar(id);
+
+        assertThat(servico.getAtivo()).isTrue();
+        assertThat(response.getAtivo()).isTrue();
+    }
+
+    @Test
+    void deveNegarReativacaoQuandoMedicoReativaServicoDeOutroMedico() {
+        var servico = novoServico();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+
+        assertThatThrownBy(() -> service.reativar(id))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deveLancarExcecaoAoReativarServicoMedicoInexistente() {
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.reativar(id))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 

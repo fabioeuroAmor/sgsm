@@ -81,6 +81,18 @@ class ServicoMedicoControllerTest {
     }
 
     @Test
+    void deveRetornar200AoReativar() {
+        UUID id = UUID.randomUUID();
+        var resposta = new ServicoMedicoResponse();
+        when(service.reativar(id)).thenReturn(resposta);
+
+        var response = controller.reativar(id);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(resposta);
+    }
+
+    @Test
     void deveRetornar200ComListaAoListar() {
         UUID medicoId = UUID.randomUUID();
         var resposta = new ServicoMedicoResponse();

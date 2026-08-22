@@ -50,6 +50,7 @@ class EstabelecimentoServiceTest {
 
     private Estabelecimento novoEstabelecimento() {
         var e = new Estabelecimento();
+        ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
         e.setNome("Clínica Central");
         e.setCnpj("12345678000199");
         e.setLogradouro("Rua A");
@@ -162,6 +163,7 @@ class EstabelecimentoServiceTest {
         UUID id = UUID.randomUUID();
         var estabelecimento = novoEstabelecimento();
         when(repository.findById(id)).thenReturn(Optional.of(estabelecimento));
+        when(repository.save(estabelecimento)).thenReturn(estabelecimento);
 
         service.remover(id);
 
@@ -175,6 +177,30 @@ class EstabelecimentoServiceTest {
         when(repository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.remover(id))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void deveReativarEstabelecimento() {
+        UUID id = UUID.randomUUID();
+        var estabelecimento = novoEstabelecimento();
+        estabelecimento.setAtivo(false);
+        when(repository.findById(id)).thenReturn(Optional.of(estabelecimento));
+        when(repository.save(estabelecimento)).thenReturn(estabelecimento);
+
+        var response = service.reativar(id);
+
+        assertThat(estabelecimento.getAtivo()).isTrue();
+        assertThat(response.getAtivo()).isTrue();
+        verify(repository).save(estabelecimento);
+    }
+
+    @Test
+    void deveLancarExcecaoAoReativarEstabelecimentoInexistente() {
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.reativar(id))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 
@@ -195,6 +221,26 @@ class EstabelecimentoServiceTest {
         var resultado = service.listar(true, null, "São Paulo");
 
         assertThat(resultado).hasSize(1);
+    }
+
+    @Test
+    void deveListarPorUfECidadeQuandoAmbosInformadosSemAtivo() {
+        when(repository.findAllByUfAndCidade("GO", "Goiânia")).thenReturn(List.of(novoEstabelecimento()));
+
+        var resultado = service.listar(null, "go", "Goiânia");
+
+        assertThat(resultado).hasSize(1);
+        verify(repository).findAllByUfAndCidade("GO", "Goiânia");
+    }
+
+    @Test
+    void deveListarPorUfCidadeEAtivoQuandoTodosInformados() {
+        when(repository.findAllByUfAndCidadeAndAtivo("GO", "Goiânia", true)).thenReturn(List.of(novoEstabelecimento()));
+
+        var resultado = service.listar(true, "go", "Goiânia");
+
+        assertThat(resultado).hasSize(1);
+        verify(repository).findAllByUfAndCidadeAndAtivo("GO", "Goiânia", true);
     }
 
     @Test

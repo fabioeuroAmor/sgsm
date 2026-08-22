@@ -78,19 +78,30 @@ public class MedicoService {
     }
 
     public void remover(UUID id) {
+        UUID ref = contextoSeguranca.getReferenciaId();
+        if (contextoSeguranca.isMedico() && !id.equals(ref)) {
+            throw new AcessoNegadoException("Médico não pode inativar outro médico: " + id);
+        }
         var medico = buscarOuLancarErro(id);
         medico.setAtivo(false);
-        repository.save(medico);
+        var salvo = repository.save(medico);
+        vetorizacaoPublisher.publicar("MEDICO", salvo.getId().toString(), "UPDATE");
+    }
+
+    public MedicoResponse reativar(UUID id) {
+        UUID ref = contextoSeguranca.getReferenciaId();
+        if (contextoSeguranca.isMedico() && !id.equals(ref)) {
+            throw new AcessoNegadoException("Médico não pode reativar outro médico: " + id);
+        }
+        var medico = buscarOuLancarErro(id);
+        medico.setAtivo(true);
+        var salvo = repository.save(medico);
+        vetorizacaoPublisher.publicar("MEDICO", salvo.getId().toString(), "UPDATE");
+        return modelMapper.map(salvo, MedicoResponse.class);
     }
 
     @Transactional(readOnly = true)
     public List<MedicoResponse> listar(Boolean ativo, String especialidade) {
-        if (contextoSeguranca.isMedico()) {
-            return repository.findById(contextoSeguranca.getReferenciaId())
-                    .map(m -> List.of(modelMapper.map(m, MedicoResponse.class)))
-                    .orElse(List.of());
-        }
-
         List<Medico> resultado;
 
         if (especialidade != null && ativo != null) {

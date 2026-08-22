@@ -42,6 +42,9 @@ public class PacienteService {
 
     // UC - Cadastrar paciente
     public PacienteResponse cadastrar(CadastrarPacienteRequest request) {
+        if (!cpfValido(request.cpf())) {
+            throw new IllegalArgumentException("CPF inválido: " + request.cpf());
+        }
         if (repository.existsByCpf(request.cpf())) {
             throw new IllegalArgumentException("CPF já cadastrado: " + request.cpf());
         }
@@ -96,7 +99,17 @@ public class PacienteService {
     public void remover(UUID id) {
         var paciente = buscarOuLancarErro(id);
         paciente.setAtivo(false);
-        repository.save(paciente);
+        var salvo = repository.save(paciente);
+        vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
+    }
+
+    // UC - Reativar paciente
+    public PacienteResponse reativar(UUID id) {
+        var paciente = buscarOuLancarErro(id);
+        paciente.setAtivo(true);
+        var salvo = repository.save(paciente);
+        vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
+        return modelMapper.map(salvo, PacienteResponse.class);
     }
 
     // UC - Listar pacientes
@@ -119,5 +132,25 @@ public class PacienteService {
     private Paciente buscarOuLancarErro(UUID id) {
         return repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Paciente não encontrado: " + id));
+    }
+
+    private boolean cpfValido(String cpf) {
+        String d = cpf == null ? "" : cpf.replaceAll("\\D", "");
+        if (d.length() != 11 || d.chars().distinct().count() == 1) {
+            return false;
+        }
+        int dv1 = calcularDigitoVerificadorCpf(d, 9);
+        int dv2 = calcularDigitoVerificadorCpf(d, 10);
+        return dv1 == Character.getNumericValue(d.charAt(9))
+                && dv2 == Character.getNumericValue(d.charAt(10));
+    }
+
+    private int calcularDigitoVerificadorCpf(String d, int tamanho) {
+        int soma = 0;
+        for (int i = 0; i < tamanho; i++) {
+            soma += Character.getNumericValue(d.charAt(i)) * (tamanho + 1 - i);
+        }
+        int resto = (soma * 10) % 11;
+        return (resto == 10 || resto == 11) ? 0 : resto;
     }
 }

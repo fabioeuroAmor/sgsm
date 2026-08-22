@@ -73,7 +73,16 @@ public class EstabelecimentoService {
     public void remover(UUID id) {
         var estabelecimento = buscarOuLancarErro(id);
         estabelecimento.setAtivo(false);
-        repository.save(estabelecimento);
+        var salvo = repository.save(estabelecimento);
+        vetorizacaoPublisher.publicar("ESTABELECIMENTO", salvo.getId().toString(), "UPDATE");
+    }
+
+    public EstabelecimentoResponse reativar(UUID id) {
+        var estabelecimento = buscarOuLancarErro(id);
+        estabelecimento.setAtivo(true);
+        var salvo = repository.save(estabelecimento);
+        vetorizacaoPublisher.publicar("ESTABELECIMENTO", salvo.getId().toString(), "UPDATE");
+        return modelMapper.map(salvo, EstabelecimentoResponse.class);
     }
 
     @Transactional(readOnly = true)
@@ -96,6 +105,10 @@ public class EstabelecimentoService {
                 final Boolean filtroAtivo = ativo;
                 resultado = resultado.stream().filter(e -> filtroAtivo.equals(e.getAtivo())).toList();
             }
+        } else if (uf != null && cidade != null && ativo != null) {
+            resultado = repository.findAllByUfAndCidadeAndAtivo(uf.toUpperCase(), cidade, ativo);
+        } else if (uf != null && cidade != null) {
+            resultado = repository.findAllByUfAndCidade(uf.toUpperCase(), cidade);
         } else if (uf != null && ativo != null) {
             resultado = repository.findAllByUfAndAtivo(uf.toUpperCase(), ativo);
         } else if (cidade != null && ativo != null) {

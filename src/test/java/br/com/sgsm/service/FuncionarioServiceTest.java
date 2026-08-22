@@ -133,6 +133,21 @@ class FuncionarioServiceTest {
         verify(repository, never()).save(any());
     }
 
+    @Test
+    void deveLancarExcecaoAoCadastrarComEmailDuplicado() {
+        UUID estabId = UUID.randomUUID();
+        var request = new CadastrarFuncionarioRequest("X", "123.456.789-00", "duplicado@email.com", null, "Aux", estabId);
+        when(estabelecimentoRepository.existsById(estabId)).thenReturn(true);
+        when(contextoSeguranca.isMedico()).thenReturn(false);
+        when(repository.existsByCpf("123.456.789-00")).thenReturn(false);
+        when(repository.existsByEmail("duplicado@email.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.cadastrar(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicado@email.com");
+        verify(repository, never()).save(any());
+    }
+
     // ─── consultar ───────────────────────────────────────────────────────────
 
     @Test
@@ -377,5 +392,70 @@ class FuncionarioServiceTest {
         assertThatThrownBy(() -> service.remover(id))
                 .isInstanceOf(AcessoNegadoException.class);
         verify(repository, never()).save(any());
+    }
+
+    // ─── reativar ────────────────────────────────────────────────────────────
+
+    @Test
+    void deveReativarFuncionarioQuandoNaoMedico() {
+        UUID id = UUID.randomUUID();
+        UUID estabId = UUID.randomUUID();
+        var func = novoFuncionario(estabId);
+        func.setAtivo(false);
+        when(repository.findById(id)).thenReturn(Optional.of(func));
+        when(contextoSeguranca.isMedico()).thenReturn(false);
+        when(repository.save(func)).thenReturn(func);
+
+        var response = service.reativar(id);
+
+        assertThat(func.getAtivo()).isTrue();
+        assertThat(response.getAtivo()).isTrue();
+        verify(repository).save(func);
+    }
+
+    @Test
+    void deveReativarFuncionarioQuandoMedicoVinculadoAoEstabelecimento() {
+        UUID medicoId = UUID.randomUUID();
+        UUID estabId = UUID.randomUUID();
+        UUID id = UUID.randomUUID();
+        var func = novoFuncionario(estabId);
+        func.setAtivo(false);
+        when(repository.findById(id)).thenReturn(Optional.of(func));
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(medicoId);
+        when(medicoEstabelecimentoRepository.findById_MedicoIdAndAtivo(medicoId, true))
+                .thenReturn(List.of(vincular(medicoId, estabId)));
+        when(repository.save(func)).thenReturn(func);
+
+        var response = service.reativar(id);
+
+        assertThat(func.getAtivo()).isTrue();
+        assertThat(response.getAtivo()).isTrue();
+    }
+
+    @Test
+    void deveLancarExcecaoAoReativarFuncionarioDeEstabelecimentoNaoVinculadoAoMedico() {
+        UUID medicoId = UUID.randomUUID();
+        UUID estabId = UUID.randomUUID();
+        UUID outroEstabId = UUID.randomUUID();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(novoFuncionario(estabId)));
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(medicoId);
+        when(medicoEstabelecimentoRepository.findById_MedicoIdAndAtivo(medicoId, true))
+                .thenReturn(List.of(vincular(medicoId, outroEstabId)));
+
+        assertThatThrownBy(() -> service.reativar(id))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deveLancarExcecaoAoReativarFuncionarioInexistente() {
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.reativar(id))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 }

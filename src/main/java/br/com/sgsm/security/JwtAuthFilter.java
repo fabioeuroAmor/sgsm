@@ -44,7 +44,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = header.substring(7);
 
         if (!jwtService.tokenValido(token)) {
-            chain.doFilter(request, response);
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token inválido ou expirado");
             return;
         }
 
@@ -53,7 +53,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         // Verifica blacklist: token revogado via logout → 401
         String jti = claims.getId();
         if (jti != null && Boolean.TRUE.equals(redis.hasKey(BLACKLIST_PREFIX + jti))) {
-            chain.doFilter(request, response);
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token revogado");
             return;
         }
 

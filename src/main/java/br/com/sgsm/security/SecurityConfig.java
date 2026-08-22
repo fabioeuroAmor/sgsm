@@ -28,6 +28,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Swagger
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                // /error precisa ser liberado: response.sendError() no JwtAuthFilter dispara um
+                // forward interno pra cá, que reentra na cadeia de segurança sem token válido —
+                // sem isso, o forward era barrado com 403 e sobrescrevia o 401 original.
+                .requestMatchers("/error").permitAll()
                 // Auto-cadastro publico: novo medico/paciente cria seu perfil antes de autenticar
                 .requestMatchers(HttpMethod.POST, "/v1/api/medicos").permitAll()
                 .requestMatchers(HttpMethod.POST, "/v1/api/pacientes").permitAll()
@@ -38,6 +42,10 @@ public class SecurityConfig {
                     .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers(HttpMethod.PUT, "/v1/api/medicos/**")
                     .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                .requestMatchers(HttpMethod.DELETE, "/v1/api/medicos/**")
+                    .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                .requestMatchers(HttpMethod.PATCH, "/v1/api/medicos/**")
+                    .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 // Pacientes: leitura para todos os roles; escrita apenas para PACIENTE (próprios dados), FUNCIONARIO e DESENVOLVEDOR
                 .requestMatchers(HttpMethod.GET, "/v1/api/pacientes/**")
                     .hasAnyRole("PACIENTE", "MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
@@ -47,11 +55,13 @@ public class SecurityConfig {
                     .hasAnyRole("PACIENTE", "FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers(HttpMethod.DELETE, "/v1/api/pacientes/**")
                     .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR")
+                .requestMatchers(HttpMethod.PATCH, "/v1/api/pacientes/**")
+                    .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR")
                 // Agendamentos: todos autenticados; segregacao feita no Service
                 .requestMatchers("/v1/api/agendamentos/**").authenticated()
                 // Agenda e servicos
-                .requestMatchers("/v1/api/agenda/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
-                .requestMatchers("/v1/api/servicos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                .requestMatchers("/v1/api/agenda-medico/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                .requestMatchers("/v1/api/servicos-medicos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers("/v1/api/estabelecimentos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 // Funcionarios: MEDICO gerencia apenas funcionarios dos seus estabelecimentos
                 .requestMatchers("/v1/api/funcionarios/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")

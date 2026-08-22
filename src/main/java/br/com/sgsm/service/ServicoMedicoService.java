@@ -5,8 +5,10 @@ import br.com.sgsm.dto.AtualizarServicoMedicoRequest;
 import br.com.sgsm.dto.CadastrarServicoMedicoRequest;
 import br.com.sgsm.dto.ServicoMedicoResponse;
 import br.com.sgsm.events.VetorizacaoPublisher;
+import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.ServicoMedicoRepository;
+import br.com.sgsm.security.ContextoSeguranca;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,12 +23,14 @@ public class ServicoMedicoService {
     private final ServicoMedicoRepository repository;
     private final ModelMapper modelMapper;
     private final VetorizacaoPublisher vetorizacaoPublisher;
+    private final ContextoSeguranca contextoSeguranca;
 
     public ServicoMedicoService(ServicoMedicoRepository repository, ModelMapper modelMapper,
-                                VetorizacaoPublisher vetorizacaoPublisher) {
+                                VetorizacaoPublisher vetorizacaoPublisher, ContextoSeguranca contextoSeguranca) {
         this.repository = repository;
         this.modelMapper = modelMapper;
         this.vetorizacaoPublisher = vetorizacaoPublisher;
+        this.contextoSeguranca = contextoSeguranca;
     }
 
     public ServicoMedicoResponse cadastrar(CadastrarServicoMedicoRequest request) {
@@ -45,6 +49,7 @@ public class ServicoMedicoService {
 
     public ServicoMedicoResponse atualizar(UUID id, AtualizarServicoMedicoRequest request) {
         var servico = buscarOuLancarErro(id);
+        verificarPosse(servico.getMedicoId());
         modelMapper.map(request, servico);
         var salvo = repository.save(servico);
         vetorizacaoPublisher.publicar("SERVICO_MEDICO", salvo.getId().toString(), "UPDATE");
@@ -53,8 +58,26 @@ public class ServicoMedicoService {
 
     public void remover(UUID id) {
         var servico = buscarOuLancarErro(id);
+        verificarPosse(servico.getMedicoId());
         servico.setAtivo(false);
-        repository.save(servico);
+        var salvo = repository.save(servico);
+        vetorizacaoPublisher.publicar("SERVICO_MEDICO", salvo.getId().toString(), "UPDATE");
+    }
+
+    public ServicoMedicoResponse reativar(UUID id) {
+        var servico = buscarOuLancarErro(id);
+        verificarPosse(servico.getMedicoId());
+        servico.setAtivo(true);
+        var salvo = repository.save(servico);
+        vetorizacaoPublisher.publicar("SERVICO_MEDICO", salvo.getId().toString(), "UPDATE");
+        return modelMapper.map(salvo, ServicoMedicoResponse.class);
+    }
+
+    private void verificarPosse(UUID medicoId) {
+        UUID ref = contextoSeguranca.getReferenciaId();
+        if (contextoSeguranca.isMedico() && !medicoId.equals(ref)) {
+            throw new AcessoNegadoException("Médico não pode gerenciar serviço de outro médico: " + medicoId);
+        }
     }
 
     @Transactional(readOnly = true)

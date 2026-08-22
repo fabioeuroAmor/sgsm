@@ -46,6 +46,12 @@ public class EstabelecimentoController {
         return ResponseEntity.noContent().build();
     }
 
+    // UC - Reativar estabelecimento
+    @PatchMapping("/{id}/reativar")
+    public ResponseEntity<EstabelecimentoResponse> reativar(@PathVariable UUID id) {
+        return ResponseEntity.ok(service.reativar(id));
+    }
+
     // UC - Listar estabelecimentos
     @GetMapping
     public ResponseEntity<List<EstabelecimentoResponse>> listar(
