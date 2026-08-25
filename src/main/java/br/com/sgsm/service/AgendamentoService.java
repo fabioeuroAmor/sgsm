@@ -139,6 +139,18 @@ public class AgendamentoService {
         return slots;
     }
 
+    @Transactional(readOnly = true)
+    public List<LocalDate> listarDiasComDisponibilidade(UUID medicoId, UUID estabelecimentoId, YearMonth mes) {
+        List<LocalDate> dias = new ArrayList<>();
+        LocalDate fim = mes.atEndOfMonth();
+        for (LocalDate data = mes.atDay(1); !data.isAfter(fim); data = data.plusDays(1)) {
+            if (!listarSlotsDisponiveis(medicoId, estabelecimentoId, data).isEmpty()) {
+                dias.add(data);
+            }
+        }
+        return dias;
+    }
+
     public AgendamentoResponse cadastrar(CadastrarAgendamentoRequest request) {
         if (contextoSeguranca.isPaciente()) {
             UUID ref = contextoSeguranca.getReferenciaId();
