@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,6 +37,15 @@ public class AgendamentoController {
             @RequestParam(required = false) UUID estabelecimentoId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data) {
         return ResponseEntity.ok(service.listarSlotsDisponiveis(medicoId, estabelecimentoId, data));
+    }
+
+    // UC - Listar dias do mês com pelo menos um slot disponível (para destacar no calendário)
+    @GetMapping("/dias-disponiveis")
+    public ResponseEntity<List<LocalDate>> listarDiasComDisponibilidade(
+            @RequestParam UUID medicoId,
+            @RequestParam(required = false) UUID estabelecimentoId,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth mes) {
+        return ResponseEntity.ok(service.listarDiasComDisponibilidade(medicoId, estabelecimentoId, mes));
     }
 
     // UC - Cadastrar agendamento

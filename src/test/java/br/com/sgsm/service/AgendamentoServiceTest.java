@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
@@ -280,6 +281,52 @@ class AgendamentoServiceTest {
         var resultado = service.listarSlotsDisponiveis(medicoId, estabelecimentoId, data);
 
         assertThat(resultado).isEmpty();
+    }
+
+    // ---------- listarDiasComDisponibilidade ----------
+
+    @Test
+    void deveListarSoDiasComAgendaDisponivelNoMes() {
+        UUID medicoId = UUID.randomUUID();
+        UUID estabelecimentoId = UUID.randomUUID();
+        YearMonth mes = YearMonth.now(ZONA).plusMonths(2); // garante mes inteiro no futuro
+
+        var agendaSegunda = new AgendaMedico();
+        agendaSegunda.setHoraInicio(java.time.LocalTime.of(8, 0));
+        agendaSegunda.setHoraFim(java.time.LocalTime.of(9, 0));
+        agendaSegunda.setDuracaoSlotMinutos(30);
+        agendaSegunda.setDataVigenciaInicio(LocalDate.of(2020, 1, 1));
+        agendaSegunda.setDomiciliar(false);
+
+        when(agendaMedicoRepository.findByMedicoIdAndEstabelecimentoIdAndDiaSemanaAndAtivo(
+                any(), any(), any(), any())).thenReturn(List.of());
+        when(agendaMedicoRepository.findByMedicoIdAndEstabelecimentoIdAndDiaSemanaAndAtivo(
+                medicoId, estabelecimentoId, DiaSemana.SEGUNDA, true)).thenReturn(List.of(agendaSegunda));
+        when(bloqueioAgendaRepository.findByMedicoAndPeriodo(any(), any(), any(), any())).thenReturn(List.of());
+        when(agendamentoRepository.findOcupadosByMedicoAndData(any(), any(), any(), anyList())).thenReturn(List.of());
+
+        var resultado = service.listarDiasComDisponibilidade(medicoId, estabelecimentoId, mes);
+
+        long segundasNoMes = mes.atDay(1).datesUntil(mes.atEndOfMonth().plusDays(1))
+                .filter(d -> d.getDayOfWeek() == DayOfWeek.MONDAY)
+                .count();
+        assertThat(resultado).hasSize((int) segundasNoMes);
+        assertThat(resultado).allMatch(d -> d.getDayOfWeek() == DayOfWeek.MONDAY);
+    }
+
+    @Test
+    void deveRetornarVazioQuandoNenhumDiaDoMesTemAgenda() {
+        UUID medicoId = UUID.randomUUID();
+        UUID estabelecimentoId = UUID.randomUUID();
+        YearMonth mes = YearMonth.now(ZONA).plusMonths(2);
+
+        when(agendaMedicoRepository.findByMedicoIdAndEstabelecimentoIdAndDiaSemanaAndAtivo(
+                any(), any(), any(), any())).thenReturn(List.of());
+
+        var resultado = service.listarDiasComDisponibilidade(medicoId, estabelecimentoId, mes);
+
+        assertThat(resultado).isEmpty();
+        verifyNoInteractions(bloqueioAgendaRepository, agendamentoRepository);
     }
 
     // ---------- cadastrar ----------

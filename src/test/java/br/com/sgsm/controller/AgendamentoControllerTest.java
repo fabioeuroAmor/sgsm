@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
@@ -58,6 +59,20 @@ class AgendamentoControllerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsExactly(slot);
+    }
+
+    @Test
+    void deveRetornar200ComListaDeDiasDisponiveis() {
+        UUID medicoId = UUID.randomUUID();
+        UUID estabelecimentoId = UUID.randomUUID();
+        YearMonth mes = YearMonth.of(2026, 8);
+        var dia = LocalDate.of(2026, 8, 25);
+        when(service.listarDiasComDisponibilidade(medicoId, estabelecimentoId, mes)).thenReturn(List.of(dia));
+
+        var response = controller.listarDiasComDisponibilidade(medicoId, estabelecimentoId, mes);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsExactly(dia);
     }
 
     @Test
