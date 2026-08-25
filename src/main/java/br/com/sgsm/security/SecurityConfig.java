@@ -35,9 +35,10 @@ public class SecurityConfig {
                 // Auto-cadastro publico: novo medico/paciente cria seu perfil antes de autenticar
                 .requestMatchers(HttpMethod.POST, "/v1/api/medicos").permitAll()
                 .requestMatchers(HttpMethod.POST, "/v1/api/pacientes").permitAll()
-                // Medicos: MEDICO so ve a si mesmo; FUNCIONARIO e DESENVOLVEDOR veem todos
+                // Medicos: MEDICO so ve a si mesmo; FUNCIONARIO e DESENVOLVEDOR veem todos;
+                // PACIENTE precisa listar para escolher medico/servico no agendamento
                 .requestMatchers(HttpMethod.GET, "/v1/api/medicos/**")
-                    .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                    .hasAnyRole("PACIENTE", "MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers(HttpMethod.POST, "/v1/api/medicos/**")
                     .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers(HttpMethod.PUT, "/v1/api/medicos/**")
@@ -61,6 +62,10 @@ public class SecurityConfig {
                 .requestMatchers("/v1/api/agendamentos/**").authenticated()
                 // Agenda e servicos
                 .requestMatchers("/v1/api/agenda-medico/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                // Servicos medicos: leitura tambem para PACIENTE (escolher servico no agendamento);
+                // escrita continua restrita a staff
+                .requestMatchers(HttpMethod.GET, "/v1/api/servicos-medicos/**")
+                    .hasAnyRole("PACIENTE", "MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers("/v1/api/servicos-medicos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 .requestMatchers("/v1/api/estabelecimentos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
                 // Funcionarios: MEDICO gerencia apenas funcionarios dos seus estabelecimentos
