@@ -12,6 +12,7 @@ import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.AgendamentoRepository;
 import br.com.sgsm.repository.PacienteRepository;
 import br.com.sgsm.security.ContextoSeguranca;
+import br.com.sgsm.security.CpfCryptoService;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,19 +30,22 @@ public class PacienteService {
     private final ContextoSeguranca contextoSeguranca;
     private final VetorizacaoPublisher vetorizacaoPublisher;
     private final AuditoriaService auditoriaService;
+    private final CpfCryptoService cpfCryptoService;
 
     public PacienteService(PacienteRepository repository,
                            AgendamentoRepository agendamentoRepository,
                            ModelMapper modelMapper,
                            ContextoSeguranca contextoSeguranca,
                            VetorizacaoPublisher vetorizacaoPublisher,
-                           AuditoriaService auditoriaService) {
+                           AuditoriaService auditoriaService,
+                           CpfCryptoService cpfCryptoService) {
         this.repository = repository;
         this.agendamentoRepository = agendamentoRepository;
         this.modelMapper = modelMapper;
         this.contextoSeguranca = contextoSeguranca;
         this.vetorizacaoPublisher = vetorizacaoPublisher;
         this.auditoriaService = auditoriaService;
+        this.cpfCryptoService = cpfCryptoService;
     }
 
     // UC - Cadastrar paciente
@@ -49,7 +53,8 @@ public class PacienteService {
         if (!cpfValido(request.cpf())) {
             throw new IllegalArgumentException("CPF inválido: " + request.cpf());
         }
-        if (repository.existsByCpf(request.cpf())) {
+        String cpfHash = cpfCryptoService.hash(normalizarCpf(request.cpf()));
+        if (repository.existsByCpfHash(cpfHash)) {
             throw new IllegalArgumentException("CPF já cadastrado: " + request.cpf());
         }
         if (repository.existsByEmail(request.email())) {
@@ -57,6 +62,7 @@ public class PacienteService {
         }
 
         var paciente = modelMapper.map(request, Paciente.class);
+        paciente.setCpfHash(cpfHash);
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "CREATE");
         auditoriaService.registrar("PACIENTE", salvo.getId(), AcaoAuditoria.CRIACAO);
@@ -142,6 +148,10 @@ public class PacienteService {
     private Paciente buscarOuLancarErro(UUID id) {
         return repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Paciente não encontrado: " + id));
+    }
+
+    private String normalizarCpf(String cpf) {
+        return cpf == null ? null : cpf.replaceAll("\\D", "");
     }
 
     private boolean cpfValido(String cpf) {
