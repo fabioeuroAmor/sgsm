@@ -16,6 +16,10 @@ public class ContextoSeguranca {
         return atributoRequest("perfil");
     }
 
+    public String getEmail() {
+        return atributoRequest("email");
+    }
+
     public UUID getReferenciaId() {
         String val = atributoRequest("referenciaId");
         return val != null ? UUID.fromString(val) : null;
