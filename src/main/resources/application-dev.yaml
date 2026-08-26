@@ -21,6 +21,12 @@ spring:
 jwt:
   secret: sgsm-chave-desenvolvimento-local-minimo-256-bits-nao-usar-em-producao
 
+sgsm:
+  crypto:
+    # Chaves de desenvolvimento local — NAO usar em producao. Em hom/prd vêm de variável de ambiente.
+    cpf-key: ngKlS3LNRsDEW0jmZqYtWD/Rh2jQNIx0AJ/4UsNWUlg=
+    cpf-hmac-key: vAx0ieowDithdCpiBjJseVKZqv2P2iLxtg+1FC4MdZU=
+
 logging:
   level:
     br.com.sgsm: DEBUG

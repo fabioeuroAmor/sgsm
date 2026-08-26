@@ -9,9 +9,11 @@ public interface PacienteRepository extends JpaRepository<Paciente, UUID> {
 
     List<Paciente> findAllByAtivo(Boolean ativo);
 
-    boolean existsByCpf(String cpf);
+    boolean existsByCpfHash(String cpfHash);
 
     boolean existsByEmail(String email);
 
     boolean existsByEmailAndIdNot(String email, UUID id);
+
+    List<Paciente> findAllByCpfHashIsNull();
 }

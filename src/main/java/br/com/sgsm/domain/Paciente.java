@@ -1,5 +1,6 @@
 package br.com.sgsm.domain;
 
+import br.com.sgsm.security.CpfCryptoConverter;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -16,8 +17,16 @@ public class Paciente {
     @Column(nullable = false, length = 150)
     private String nome;
 
-    @Column(nullable = false, length = 14, unique = true)
+    // Cifrado em repouso (AES-256-GCM, ver CpfCryptoConverter) — não-determinístico,
+    // por isso a unicidade não é mais garantida nesta coluna, e sim em cpfHash.
+    @Convert(converter = CpfCryptoConverter.class)
+    @Column(nullable = false, length = 255)
     private String cpf;
+
+    // Índice cego (HMAC-SHA256 do CPF normalizado) — permite checar duplicidade
+    // sem decifrar. Nullable até o backfill (CpfBackfillRunner) migrar linhas antigas.
+    @Column(name = "cpf_hash", length = 64)
+    private String cpfHash;
 
     @Column(name = "data_nascimento", nullable = false)
     private LocalDate dataNascimento;
@@ -75,6 +84,7 @@ public class Paciente {
     public UUID getId() { return id; }
     public String getNome() { return nome; }
     public String getCpf() { return cpf; }
+    public String getCpfHash() { return cpfHash; }
     public LocalDate getDataNascimento() { return dataNascimento; }
     public String getEmail() { return email; }
     public String getTelefone() { return telefone; }
@@ -91,6 +101,7 @@ public class Paciente {
 
     public void setNome(String nome) { this.nome = nome; }
     public void setCpf(String cpf) { this.cpf = cpf; }
+    public void setCpfHash(String cpfHash) { this.cpfHash = cpfHash; }
     public void setDataNascimento(LocalDate dataNascimento) { this.dataNascimento = dataNascimento; }
     public void setEmail(String email) { this.email = email; }
     public void setTelefone(String telefone) { this.telefone = telefone; }

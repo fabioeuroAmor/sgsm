@@ -28,6 +28,11 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
 
+sgsm:
+  crypto:
+    cpf-key: ${CPF_CRYPTO_KEY}
+    cpf-hmac-key: ${CPF_HMAC_KEY}
+
 logging:
   level:
     root: WARN

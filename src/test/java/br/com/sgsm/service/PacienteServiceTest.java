@@ -13,13 +13,16 @@ import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.repository.PacienteRepository;
 import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.security.ContextoSeguranca;
+import br.com.sgsm.security.CpfCryptoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,12 +46,17 @@ class PacienteServiceTest {
     @Mock
     private AuditoriaService auditoriaService;
 
+    private CpfCryptoService cpfCryptoService;
     private PacienteService service;
 
     @BeforeEach
     void setUp() {
+        String chaveAes = Base64.getEncoder().encodeToString("chave-teste-de-32-bytes-exatos!!".getBytes());
+        String chaveHmac = Base64.getEncoder().encodeToString("outra-chave-de-32-bytes-teste!!!".getBytes());
+        cpfCryptoService = new CpfCryptoService(chaveAes, chaveHmac);
         service = new PacienteService(repository, agendamentoRepository,
-                new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher, auditoriaService);
+                new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher, auditoriaService,
+                cpfCryptoService);
     }
 
     private Paciente novoPaciente() {
@@ -82,6 +90,10 @@ class PacienteServiceTest {
 
         assertThat(response.getNome()).isEqualTo("João Silva");
         verify(auditoriaService).registrar(eq("PACIENTE"), any(UUID.class), eq(AcaoAuditoria.CRIACAO));
+
+        var captor = ArgumentCaptor.forClass(Paciente.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getCpfHash()).isEqualTo(cpfCryptoService.hash("52998224725"));
     }
 
     @Test
@@ -97,7 +109,7 @@ class PacienteServiceTest {
 
     @Test
     void deveLancarExcecaoQuandoCpfJaCadastrado() {
-        when(repository.existsByCpf("52998224725")).thenReturn(true);
+        when(repository.existsByCpfHash(cpfCryptoService.hash("52998224725"))).thenReturn(true);
         var request = new CadastrarPacienteRequest("João Silva", "52998224725",
                 LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
 
@@ -109,7 +121,6 @@ class PacienteServiceTest {
 
     @Test
     void deveLancarExcecaoQuandoEmailJaCadastrado() {
-        when(repository.existsByCpf("52998224725")).thenReturn(false);
         when(repository.existsByEmail("joao@sgsm.com.br")).thenReturn(true);
         var request = new CadastrarPacienteRequest("João Silva", "52998224725",
                 LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
