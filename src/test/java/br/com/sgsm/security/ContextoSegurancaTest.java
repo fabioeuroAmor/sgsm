@@ -32,9 +32,14 @@ class ContextoSegurancaTest {
     }
 
     private void configurarRequestAttributes(String perfil, String referenciaId) {
+        configurarRequestAttributes(perfil, referenciaId, null);
+    }
+
+    private void configurarRequestAttributes(String perfil, String referenciaId, String email) {
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getAttribute("perfil")).thenReturn(perfil);
         when(request.getAttribute("referenciaId")).thenReturn(referenciaId);
+        when(request.getAttribute("email")).thenReturn(email);
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
     }
 
@@ -58,6 +63,20 @@ class ContextoSegurancaTest {
         RequestContextHolder.resetRequestAttributes();
 
         assertThat(contexto.getPerfil()).isNull();
+    }
+
+    @Test
+    void deveRetornarEmailDoAtributoDeRequisicao() {
+        configurarRequestAttributes(null, null, "usuario@teste.com");
+
+        assertThat(contexto.getEmail()).isEqualTo("usuario@teste.com");
+    }
+
+    @Test
+    void deveRetornarEmailNuloQuandoAtributoAusente() {
+        configurarRequestAttributes(null, null);
+
+        assertThat(contexto.getEmail()).isNull();
     }
 
     @Test

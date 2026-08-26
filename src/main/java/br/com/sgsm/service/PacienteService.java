@@ -1,5 +1,6 @@
 package br.com.sgsm.service;
 
+import br.com.sgsm.domain.AcaoAuditoria;
 import br.com.sgsm.domain.Agendamento;
 import br.com.sgsm.domain.Paciente;
 import br.com.sgsm.dto.AtualizarPacienteRequest;
@@ -27,17 +28,20 @@ public class PacienteService {
     private final ModelMapper modelMapper;
     private final ContextoSeguranca contextoSeguranca;
     private final VetorizacaoPublisher vetorizacaoPublisher;
+    private final AuditoriaService auditoriaService;
 
     public PacienteService(PacienteRepository repository,
                            AgendamentoRepository agendamentoRepository,
                            ModelMapper modelMapper,
                            ContextoSeguranca contextoSeguranca,
-                           VetorizacaoPublisher vetorizacaoPublisher) {
+                           VetorizacaoPublisher vetorizacaoPublisher,
+                           AuditoriaService auditoriaService) {
         this.repository = repository;
         this.agendamentoRepository = agendamentoRepository;
         this.modelMapper = modelMapper;
         this.contextoSeguranca = contextoSeguranca;
         this.vetorizacaoPublisher = vetorizacaoPublisher;
+        this.auditoriaService = auditoriaService;
     }
 
     // UC - Cadastrar paciente
@@ -55,6 +59,7 @@ public class PacienteService {
         var paciente = modelMapper.map(request, Paciente.class);
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "CREATE");
+        auditoriaService.registrar("PACIENTE", salvo.getId(), AcaoAuditoria.CRIACAO);
         return modelMapper.map(salvo, PacienteResponse.class);
     }
 
@@ -72,9 +77,11 @@ public class PacienteService {
                 throw new AcessoNegadoException("Acesso negado ao paciente: " + id);
             }
         }
-        return repository.findById(id)
+        var response = repository.findById(id)
                 .map(p -> modelMapper.map(p, PacienteResponse.class))
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Paciente não encontrado: " + id));
+        auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.LEITURA);
+        return response;
     }
 
     // UC - Atualizar paciente
@@ -92,6 +99,7 @@ public class PacienteService {
         modelMapper.map(request, paciente);
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
+        auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.ATUALIZACAO);
         return modelMapper.map(salvo, PacienteResponse.class);
     }
 
@@ -101,6 +109,7 @@ public class PacienteService {
         paciente.setAtivo(false);
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
+        auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.INATIVACAO);
     }
 
     // UC - Reativar paciente
@@ -109,6 +118,7 @@ public class PacienteService {
         paciente.setAtivo(true);
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
+        auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.REATIVACAO);
         return modelMapper.map(salvo, PacienteResponse.class);
     }
 
