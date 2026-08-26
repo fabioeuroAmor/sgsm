@@ -1,6 +1,7 @@
 package br.com.sgsm.service;
 
 import br.com.sgsm.config.ModelMapperConfig;
+import br.com.sgsm.domain.AcaoAuditoria;
 import br.com.sgsm.domain.Agendamento;
 import br.com.sgsm.domain.Paciente;
 import br.com.sgsm.dto.AtualizarPacienteRequest;
@@ -39,13 +40,15 @@ class PacienteServiceTest {
     private ContextoSeguranca contextoSeguranca;
     @Mock
     private VetorizacaoPublisher vetorizacaoPublisher;
+    @Mock
+    private AuditoriaService auditoriaService;
 
     private PacienteService service;
 
     @BeforeEach
     void setUp() {
         service = new PacienteService(repository, agendamentoRepository,
-                new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher);
+                new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher, auditoriaService);
     }
 
     private Paciente novoPaciente() {
@@ -78,6 +81,7 @@ class PacienteServiceTest {
         var response = service.cadastrar(request);
 
         assertThat(response.getNome()).isEqualTo("João Silva");
+        verify(auditoriaService).registrar(eq("PACIENTE"), any(UUID.class), eq(AcaoAuditoria.CRIACAO));
     }
 
     @Test
@@ -125,6 +129,7 @@ class PacienteServiceTest {
         var response = service.consultar(id);
 
         assertThat(response.getNome()).isEqualTo("João Silva");
+        verify(auditoriaService).registrar("PACIENTE", id, AcaoAuditoria.LEITURA);
     }
 
     @Test
@@ -192,6 +197,7 @@ class PacienteServiceTest {
         var response = service.atualizar(id, request);
 
         assertThat(response.getNome()).isEqualTo("João S. Silva");
+        verify(auditoriaService).registrar("PACIENTE", id, AcaoAuditoria.ATUALIZACAO);
     }
 
     @Test
@@ -230,6 +236,7 @@ class PacienteServiceTest {
 
         assertThat(paciente.getAtivo()).isFalse();
         verify(repository).save(paciente);
+        verify(auditoriaService).registrar("PACIENTE", id, AcaoAuditoria.INATIVACAO);
     }
 
     @Test
@@ -254,6 +261,7 @@ class PacienteServiceTest {
         assertThat(paciente.getAtivo()).isTrue();
         assertThat(response.getAtivo()).isTrue();
         verify(repository).save(paciente);
+        verify(auditoriaService).registrar("PACIENTE", id, AcaoAuditoria.REATIVACAO);
     }
 
     @Test
