@@ -2,6 +2,7 @@ package br.com.sgsm.controller;
 
 import br.com.sgsm.dto.AtualizarPacienteRequest;
 import br.com.sgsm.dto.CadastrarPacienteRequest;
+import br.com.sgsm.dto.PacienteExportacaoResponse;
 import br.com.sgsm.dto.PacienteResponse;
 import br.com.sgsm.service.PacienteService;
 import org.springframework.http.HttpStatus;
@@ -59,5 +60,18 @@ public class PacienteController {
     public ResponseEntity<List<PacienteResponse>> listar(
             @RequestParam(required = false) Boolean ativo) {
         return ResponseEntity.ok(service.listar(ativo));
+    }
+
+    // UC - Exportar dados do paciente (LGPD 3.2 — portabilidade)
+    @GetMapping("/{id}/exportar")
+    public ResponseEntity<PacienteExportacaoResponse> exportar(@PathVariable UUID id) {
+        return ResponseEntity.ok(service.exportar(id));
+    }
+
+    // UC - Anonimizar paciente (LGPD 3.3 — direito ao esquecimento)
+    @PatchMapping("/{id}/anonimizar")
+    public ResponseEntity<Void> anonimizar(@PathVariable UUID id) {
+        service.anonimizar(id);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -14,5 +14,6 @@ public record CadastrarPacienteRequest(
         String bairro,
         String cidade,
         String uf,
-        String cep
+        String cep,
+        Boolean consentimentoLgpd
 ) {}
