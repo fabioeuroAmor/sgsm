@@ -5,6 +5,7 @@ import br.com.sgsm.domain.Agendamento;
 import br.com.sgsm.domain.Paciente;
 import br.com.sgsm.dto.AtualizarPacienteRequest;
 import br.com.sgsm.dto.CadastrarPacienteRequest;
+import br.com.sgsm.dto.PacienteExportacaoResponse;
 import br.com.sgsm.dto.PacienteResponse;
 import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.exception.AcessoNegadoException;
@@ -17,6 +18,8 @@ import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,6 +34,7 @@ public class PacienteService {
     private final VetorizacaoPublisher vetorizacaoPublisher;
     private final AuditoriaService auditoriaService;
     private final CpfCryptoService cpfCryptoService;
+    private final AgendamentoService agendamentoService;
 
     public PacienteService(PacienteRepository repository,
                            AgendamentoRepository agendamentoRepository,
@@ -38,7 +42,8 @@ public class PacienteService {
                            ContextoSeguranca contextoSeguranca,
                            VetorizacaoPublisher vetorizacaoPublisher,
                            AuditoriaService auditoriaService,
-                           CpfCryptoService cpfCryptoService) {
+                           CpfCryptoService cpfCryptoService,
+                           AgendamentoService agendamentoService) {
         this.repository = repository;
         this.agendamentoRepository = agendamentoRepository;
         this.modelMapper = modelMapper;
@@ -46,12 +51,16 @@ public class PacienteService {
         this.vetorizacaoPublisher = vetorizacaoPublisher;
         this.auditoriaService = auditoriaService;
         this.cpfCryptoService = cpfCryptoService;
+        this.agendamentoService = agendamentoService;
     }
 
     // UC - Cadastrar paciente
     public PacienteResponse cadastrar(CadastrarPacienteRequest request) {
         if (!cpfValido(request.cpf())) {
             throw new IllegalArgumentException("CPF inválido: " + request.cpf());
+        }
+        if (!Boolean.TRUE.equals(request.consentimentoLgpd())) {
+            throw new IllegalArgumentException("Consentimento com o tratamento de dados (LGPD) é obrigatório para o cadastro.");
         }
         String cpfHash = cpfCryptoService.hash(normalizarCpf(request.cpf()));
         if (repository.existsByCpfHash(cpfHash)) {
@@ -63,6 +72,7 @@ public class PacienteService {
 
         var paciente = modelMapper.map(request, Paciente.class);
         paciente.setCpfHash(cpfHash);
+        paciente.setConsentimentoLgpdEm(OffsetDateTime.now());
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "CREATE");
         auditoriaService.registrar("PACIENTE", salvo.getId(), AcaoAuditoria.CRIACAO);
@@ -113,6 +123,9 @@ public class PacienteService {
     public void remover(UUID id) {
         var paciente = buscarOuLancarErro(id);
         paciente.setAtivo(false);
+        // Base de contagem da retenção de 20 anos (POLITICA_RETENCAO_DADOS.md) usada
+        // pelo job de expurgo — nulo enquanto ativo, setado no momento do encerramento.
+        paciente.setEncerradoEm(OffsetDateTime.now());
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
         auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.INATIVACAO);
@@ -121,11 +134,66 @@ public class PacienteService {
     // UC - Reativar paciente
     public PacienteResponse reativar(UUID id) {
         var paciente = buscarOuLancarErro(id);
+        if (Boolean.TRUE.equals(paciente.getAnonimizado())) {
+            throw new IllegalStateException("Paciente anonimizado não pode ser reativado: " + id);
+        }
         paciente.setAtivo(true);
+        paciente.setEncerradoEm(null);
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
         auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.REATIVACAO);
         return modelMapper.map(salvo, PacienteResponse.class);
+    }
+
+    // UC - Exportar dados do paciente (LGPD 3.2 — portabilidade, art. 18 da LGPD)
+    @Transactional(readOnly = true)
+    public PacienteExportacaoResponse exportar(UUID id) {
+        UUID ref = contextoSeguranca.getReferenciaId();
+        boolean ehProprioTitular = contextoSeguranca.isPaciente() && id.equals(ref);
+        if (!ehProprioTitular && !contextoSeguranca.isDesenvolvedor()) {
+            throw new AcessoNegadoException("Exportação de dados é restrita ao próprio titular ou a perfil administrativo: " + id);
+        }
+        var paciente = repository.findById(id)
+                .map(p -> modelMapper.map(p, PacienteResponse.class))
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Paciente não encontrado: " + id));
+        var agendamentos = agendamentoService.listar(id, null, null);
+        auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.EXPORTACAO);
+        return new PacienteExportacaoResponse(paciente, agendamentos);
+    }
+
+    // UC - Anonimizar paciente (LGPD 3.3 — direito ao esquecimento, art. 18 da LGPD)
+    public void anonimizar(UUID id) {
+        var paciente = buscarOuLancarErro(id);
+        if (Boolean.TRUE.equals(paciente.getAnonimizado())) {
+            throw new IllegalStateException("Paciente já anonimizado: " + id);
+        }
+
+        // Mantém só o necessário para fins estatísticos/legais (POLITICA_RETENCAO_DADOS.md):
+        // nome/CPF/e-mail/telefone/endereço zerados; ano de nascimento preservado.
+        paciente.setNome("ANONIMIZADO");
+        paciente.setCpf("00000000000");
+        paciente.setCpfHash(null);
+        paciente.setEmail("anonimizado-" + id + "@sgsm.invalid");
+        paciente.setTelefone(null);
+        paciente.setLogradouro(null);
+        paciente.setNumero(null);
+        paciente.setComplemento(null);
+        paciente.setBairro(null);
+        paciente.setCidade(null);
+        paciente.setUf(null);
+        paciente.setCep(null);
+        if (paciente.getDataNascimento() != null) {
+            paciente.setDataNascimento(LocalDate.of(paciente.getDataNascimento().getYear(), 1, 1));
+        }
+        paciente.setAtivo(false);
+        paciente.setAnonimizado(true);
+        if (paciente.getEncerradoEm() == null) {
+            paciente.setEncerradoEm(OffsetDateTime.now());
+        }
+
+        var salvo = repository.save(paciente);
+        vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "ANONIMIZAR");
+        auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.ANONIMIZACAO);
     }
 
     // UC - Listar pacientes

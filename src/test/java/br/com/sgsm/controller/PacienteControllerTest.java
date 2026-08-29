@@ -2,6 +2,7 @@ package br.com.sgsm.controller;
 
 import br.com.sgsm.dto.AtualizarPacienteRequest;
 import br.com.sgsm.dto.CadastrarPacienteRequest;
+import br.com.sgsm.dto.PacienteExportacaoResponse;
 import br.com.sgsm.dto.PacienteResponse;
 import br.com.sgsm.service.PacienteService;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +36,7 @@ class PacienteControllerTest {
     @Test
     void deveRetornar201AoCadastrar() {
         var request = new CadastrarPacienteRequest("João Silva", "12345678900",
-                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
+                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null, true);
         var resposta = new PacienteResponse();
         when(service.cadastrar(request)).thenReturn(resposta);
 
@@ -101,5 +102,27 @@ class PacienteControllerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsExactly(resposta);
+    }
+
+    @Test
+    void deveRetornar200AoExportar() {
+        UUID id = UUID.randomUUID();
+        var resposta = new PacienteExportacaoResponse(new PacienteResponse(), List.of());
+        when(service.exportar(id)).thenReturn(resposta);
+
+        var response = controller.exportar(id);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(resposta);
+    }
+
+    @Test
+    void deveRetornar204AoAnonimizar() {
+        UUID id = UUID.randomUUID();
+
+        var response = controller.anonimizar(id);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verify(service).anonimizar(id);
     }
 }
