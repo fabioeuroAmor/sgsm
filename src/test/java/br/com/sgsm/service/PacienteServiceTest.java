@@ -45,6 +45,8 @@ class PacienteServiceTest {
     private VetorizacaoPublisher vetorizacaoPublisher;
     @Mock
     private AuditoriaService auditoriaService;
+    @Mock
+    private AgendamentoService agendamentoService;
 
     private CpfCryptoService cpfCryptoService;
     private PacienteService service;
@@ -56,7 +58,7 @@ class PacienteServiceTest {
         cpfCryptoService = new CpfCryptoService(chaveAes, chaveHmac);
         service = new PacienteService(repository, agendamentoRepository,
                 new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher, auditoriaService,
-                cpfCryptoService);
+                cpfCryptoService, agendamentoService);
     }
 
     private Paciente novoPaciente() {
@@ -84,7 +86,7 @@ class PacienteServiceTest {
             return e;
         });
         var request = new CadastrarPacienteRequest("João Silva", "52998224725",
-                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
+                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null, true);
 
         var response = service.cadastrar(request);
 
@@ -99,7 +101,7 @@ class PacienteServiceTest {
     @Test
     void deveLancarExcecaoQuandoCpfInvalido() {
         var request = new CadastrarPacienteRequest("João Silva", "11111111111",
-                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
+                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null, true);
 
         assertThatThrownBy(() -> service.cadastrar(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -111,7 +113,7 @@ class PacienteServiceTest {
     void deveLancarExcecaoQuandoCpfJaCadastrado() {
         when(repository.existsByCpfHash(cpfCryptoService.hash("52998224725"))).thenReturn(true);
         var request = new CadastrarPacienteRequest("João Silva", "52998224725",
-                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
+                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null, true);
 
         assertThatThrownBy(() -> service.cadastrar(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -120,10 +122,21 @@ class PacienteServiceTest {
     }
 
     @Test
+    void deveLancarExcecaoQuandoConsentimentoLgpdAusente() {
+        var request = new CadastrarPacienteRequest("João Silva", "52998224725",
+                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null, false);
+
+        assertThatThrownBy(() -> service.cadastrar(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Consentimento");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void deveLancarExcecaoQuandoEmailJaCadastrado() {
         when(repository.existsByEmail("joao@sgsm.com.br")).thenReturn(true);
         var request = new CadastrarPacienteRequest("João Silva", "52998224725",
-                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null);
+                LocalDate.of(1990, 1, 1), "joao@sgsm.com.br", null, null, null, null, null, null, null, null, true);
 
         assertThatThrownBy(() -> service.cadastrar(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -246,6 +259,7 @@ class PacienteServiceTest {
         service.remover(id);
 
         assertThat(paciente.getAtivo()).isFalse();
+        assertThat(paciente.getEncerradoEm()).isNotNull();
         verify(repository).save(paciente);
         verify(auditoriaService).registrar("PACIENTE", id, AcaoAuditoria.INATIVACAO);
     }
@@ -264,12 +278,14 @@ class PacienteServiceTest {
         UUID id = UUID.randomUUID();
         var paciente = novoPaciente();
         paciente.setAtivo(false);
+        paciente.setEncerradoEm(java.time.OffsetDateTime.now());
         when(repository.findById(id)).thenReturn(Optional.of(paciente));
         when(repository.save(paciente)).thenReturn(paciente);
 
         var response = service.reativar(id);
 
         assertThat(paciente.getAtivo()).isTrue();
+        assertThat(paciente.getEncerradoEm()).isNull();
         assertThat(response.getAtivo()).isTrue();
         verify(repository).save(paciente);
         verify(auditoriaService).registrar("PACIENTE", id, AcaoAuditoria.REATIVACAO);
@@ -281,6 +297,101 @@ class PacienteServiceTest {
         when(repository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.reativar(id))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void deveLancarExcecaoAoReativarPacienteAnonimizado() {
+        UUID id = UUID.randomUUID();
+        var paciente = novoPaciente();
+        paciente.setAtivo(false);
+        paciente.setAnonimizado(true);
+        when(repository.findById(id)).thenReturn(Optional.of(paciente));
+
+        assertThatThrownBy(() -> service.reativar(id))
+                .isInstanceOf(IllegalStateException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deveExportarDadosQuandoProprioPacienteTitular() {
+        UUID id = UUID.randomUUID();
+        when(contextoSeguranca.isPaciente()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(id);
+        when(repository.findById(id)).thenReturn(Optional.of(novoPaciente()));
+        when(agendamentoService.listar(id, null, null)).thenReturn(List.of());
+
+        var response = service.exportar(id);
+
+        assertThat(response.paciente().getNome()).isEqualTo("João Silva");
+        assertThat(response.agendamentos()).isEmpty();
+        verify(auditoriaService).registrar("PACIENTE", id, AcaoAuditoria.EXPORTACAO);
+    }
+
+    @Test
+    void deveExportarDadosQuandoDesenvolvedor() {
+        UUID id = UUID.randomUUID();
+        when(contextoSeguranca.isPaciente()).thenReturn(false);
+        when(contextoSeguranca.isDesenvolvedor()).thenReturn(true);
+        when(repository.findById(id)).thenReturn(Optional.of(novoPaciente()));
+        when(agendamentoService.listar(id, null, null)).thenReturn(List.of());
+
+        var response = service.exportar(id);
+
+        assertThat(response.paciente()).isNotNull();
+    }
+
+    @Test
+    void deveNegarExportacaoQuandoPacienteConsultaOutroPaciente() {
+        UUID id = UUID.randomUUID();
+        when(contextoSeguranca.isPaciente()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(UUID.randomUUID());
+        when(contextoSeguranca.isDesenvolvedor()).thenReturn(false);
+
+        assertThatThrownBy(() -> service.exportar(id))
+                .isInstanceOf(AcessoNegadoException.class);
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void deveAnonimizarPaciente() {
+        var paciente = novoPaciente();
+        UUID id = paciente.getId();
+        when(repository.findById(id)).thenReturn(Optional.of(paciente));
+        when(repository.save(paciente)).thenReturn(paciente);
+
+        service.anonimizar(id);
+
+        assertThat(paciente.getNome()).isEqualTo("ANONIMIZADO");
+        assertThat(paciente.getCpfHash()).isNull();
+        assertThat(paciente.getEmail()).contains("anonimizado-").contains("@sgsm.invalid");
+        assertThat(paciente.getTelefone()).isNull();
+        assertThat(paciente.getDataNascimento()).isEqualTo(LocalDate.of(1990, 1, 1));
+        assertThat(paciente.getAtivo()).isFalse();
+        assertThat(paciente.getAnonimizado()).isTrue();
+        assertThat(paciente.getEncerradoEm()).isNotNull();
+        verify(vetorizacaoPublisher).publicar("PACIENTE", id.toString(), "ANONIMIZAR");
+        verify(auditoriaService).registrar("PACIENTE", id, AcaoAuditoria.ANONIMIZACAO);
+    }
+
+    @Test
+    void deveLancarExcecaoAoAnonimizarPacienteJaAnonimizado() {
+        UUID id = UUID.randomUUID();
+        var paciente = novoPaciente();
+        paciente.setAnonimizado(true);
+        when(repository.findById(id)).thenReturn(Optional.of(paciente));
+
+        assertThatThrownBy(() -> service.anonimizar(id))
+                .isInstanceOf(IllegalStateException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deveLancarExcecaoAoAnonimizarPacienteInexistente() {
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.anonimizar(id))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 

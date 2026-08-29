@@ -61,6 +61,21 @@ public class Paciente {
     @Column(nullable = false)
     private Boolean ativo;
 
+    // LGPD (item 3 do compliance): timestamp do consentimento explícito no cadastro.
+    // Nulo em cadastros anteriores a esta feature — consentimento não é retroativo.
+    @Column(name = "consentimento_lgpd_em")
+    private OffsetDateTime consentimentoLgpdEm;
+
+    // Distingue "inativo recuperável" (ativo=false, dado intacto) de "anonimizado
+    // irreversível" (dados pessoais zerados) — reativar() bloqueia quando true.
+    @Column(nullable = false)
+    private Boolean anonimizado = false;
+
+    // Data em que o cadastro foi inativado (setado por remover()) — base de contagem
+    // da retenção de 20 anos da POLITICA_RETENCAO_DADOS.md. Nulo enquanto ativo.
+    @Column(name = "encerrado_em")
+    private OffsetDateTime encerradoEm;
+
     @Column(name = "criado_em", nullable = false, updatable = false)
     private OffsetDateTime criadoEm;
 
@@ -96,6 +111,9 @@ public class Paciente {
     public String getUf() { return uf; }
     public String getCep() { return cep; }
     public Boolean getAtivo() { return ativo; }
+    public OffsetDateTime getConsentimentoLgpdEm() { return consentimentoLgpdEm; }
+    public Boolean getAnonimizado() { return anonimizado; }
+    public OffsetDateTime getEncerradoEm() { return encerradoEm; }
     public OffsetDateTime getCriadoEm() { return criadoEm; }
     public OffsetDateTime getAtualizadoEm() { return atualizadoEm; }
 
@@ -113,4 +131,7 @@ public class Paciente {
     public void setUf(String uf) { this.uf = uf; }
     public void setCep(String cep) { this.cep = cep; }
     public void setAtivo(Boolean ativo) { this.ativo = ativo; }
+    public void setConsentimentoLgpdEm(OffsetDateTime consentimentoLgpdEm) { this.consentimentoLgpdEm = consentimentoLgpdEm; }
+    public void setAnonimizado(Boolean anonimizado) { this.anonimizado = anonimizado; }
+    public void setEncerradoEm(OffsetDateTime encerradoEm) { this.encerradoEm = encerradoEm; }
 }

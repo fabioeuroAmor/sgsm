@@ -29,6 +29,8 @@ public class PacienteResponse {
     private String uf;
     private String cep;
     private Boolean ativo;
+    private OffsetDateTime consentimentoLgpdEm;
+    private Boolean anonimizado;
     private OffsetDateTime criadoEm;
     private OffsetDateTime atualizadoEm;
 }
