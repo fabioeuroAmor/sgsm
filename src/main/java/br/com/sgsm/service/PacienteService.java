@@ -14,6 +14,8 @@ import br.com.sgsm.repository.PacienteRepository;
 import br.com.sgsm.security.ContextoSeguranca;
 import br.com.sgsm.security.CpfCryptoService;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class PacienteService {
+
+    private static final Logger log = LoggerFactory.getLogger(PacienteService.class);
 
     private final PacienteRepository repository;
     private final AgendamentoRepository agendamentoRepository;
@@ -65,7 +69,7 @@ public class PacienteService {
         paciente.setCpfHash(cpfHash);
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "CREATE");
-        auditoriaService.registrar("PACIENTE", salvo.getId(), AcaoAuditoria.CRIACAO);
+        registrarAuditoria("PACIENTE", salvo.getId(), AcaoAuditoria.CRIACAO);
         return modelMapper.map(salvo, PacienteResponse.class);
     }
 
@@ -86,7 +90,7 @@ public class PacienteService {
         var response = repository.findById(id)
                 .map(p -> modelMapper.map(p, PacienteResponse.class))
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Paciente não encontrado: " + id));
-        auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.LEITURA);
+        registrarAuditoria("PACIENTE", id, AcaoAuditoria.LEITURA);
         return response;
     }
 
@@ -105,7 +109,7 @@ public class PacienteService {
         modelMapper.map(request, paciente);
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
-        auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.ATUALIZACAO);
+        registrarAuditoria("PACIENTE", id, AcaoAuditoria.ATUALIZACAO);
         return modelMapper.map(salvo, PacienteResponse.class);
     }
 
@@ -115,7 +119,7 @@ public class PacienteService {
         paciente.setAtivo(false);
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
-        auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.INATIVACAO);
+        registrarAuditoria("PACIENTE", id, AcaoAuditoria.INATIVACAO);
     }
 
     // UC - Reativar paciente
@@ -124,7 +128,7 @@ public class PacienteService {
         paciente.setAtivo(true);
         var salvo = repository.save(paciente);
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "UPDATE");
-        auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.REATIVACAO);
+        registrarAuditoria("PACIENTE", id, AcaoAuditoria.REATIVACAO);
         return modelMapper.map(salvo, PacienteResponse.class);
     }
 
@@ -143,6 +147,16 @@ public class PacienteService {
         return resultado.stream()
                 .map(p -> modelMapper.map(p, PacienteResponse.class))
                 .toList();
+    }
+
+    // Auditoria roda em transação própria (ver AuditoriaService); uma falha ali não pode
+    // reverter uma operação de negócio já concluída, só fica registrada em log.
+    private void registrarAuditoria(String entidade, UUID entidadeId, AcaoAuditoria acao) {
+        try {
+            auditoriaService.registrar(entidade, entidadeId, acao);
+        } catch (Exception e) {
+            log.warn("Falha ao registrar auditoria de {} para {} {}: {}", acao, entidade, entidadeId, e.getMessage());
+        }
     }
 
     private Paciente buscarOuLancarErro(UUID id) {
