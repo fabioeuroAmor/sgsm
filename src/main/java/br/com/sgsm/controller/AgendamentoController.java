@@ -65,8 +65,9 @@ public class AgendamentoController {
     public ResponseEntity<List<AgendamentoResponse>> listar(
             @RequestParam(required = false) UUID pacienteId,
             @RequestParam(required = false) StatusAgendamento status,
-            @RequestParam(required = false) UUID medicoId) {
-        return ResponseEntity.ok(service.listar(pacienteId, status, medicoId));
+            @RequestParam(required = false) UUID medicoId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data) {
+        return ResponseEntity.ok(service.listar(pacienteId, status, medicoId, data));
     }
 
     // UC - Atualizar status do agendamento

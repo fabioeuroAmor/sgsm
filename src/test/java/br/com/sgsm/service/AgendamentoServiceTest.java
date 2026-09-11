@@ -610,7 +610,7 @@ class AgendamentoServiceTest {
         when(agendamentoRepository.findAllByMedicoIdAndStatus(medicoId, StatusAgendamento.PENDENTE))
                 .thenReturn(List.of(novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.PRESENCIAL)));
 
-        var resultado = service.listar(null, StatusAgendamento.PENDENTE, null);
+        var resultado = service.listar(null, StatusAgendamento.PENDENTE, null, null);
 
         assertThat(resultado).hasSize(1);
     }
@@ -624,7 +624,7 @@ class AgendamentoServiceTest {
         when(agendamentoRepository.findAllByMedicoIdAndPacienteId(medicoId, pacienteId))
                 .thenReturn(List.of(novoAgendamento(medicoId, pacienteId, StatusAgendamento.PENDENTE, TipoAgendamento.PRESENCIAL)));
 
-        var resultado = service.listar(pacienteId, null, null);
+        var resultado = service.listar(pacienteId, null, null, null);
 
         assertThat(resultado).hasSize(1);
         verify(agendamentoRepository, never()).findAllByMedicoId(any());
@@ -639,7 +639,7 @@ class AgendamentoServiceTest {
         when(agendamentoRepository.findAllByPacienteIdAndStatus(pacienteId, StatusAgendamento.CONFIRMADO))
                 .thenReturn(List.of(novoAgendamento(UUID.randomUUID(), pacienteId, StatusAgendamento.CONFIRMADO, TipoAgendamento.PRESENCIAL)));
 
-        var resultado = service.listar(null, StatusAgendamento.CONFIRMADO, null);
+        var resultado = service.listar(null, StatusAgendamento.CONFIRMADO, null, null);
 
         assertThat(resultado).hasSize(1);
     }
@@ -652,7 +652,7 @@ class AgendamentoServiceTest {
         when(agendamentoRepository.findAllByMedicoId(medicoId))
                 .thenReturn(List.of(novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.PRESENCIAL)));
 
-        var resultado = service.listar(null, null, medicoId);
+        var resultado = service.listar(null, null, medicoId, null);
 
         assertThat(resultado).hasSize(1);
     }
@@ -665,7 +665,7 @@ class AgendamentoServiceTest {
         when(agendamentoRepository.findAllByPacienteId(pacienteId))
                 .thenReturn(List.of(novoAgendamento(UUID.randomUUID(), pacienteId, StatusAgendamento.PENDENTE, TipoAgendamento.PRESENCIAL)));
 
-        var resultado = service.listar(pacienteId, null, null);
+        var resultado = service.listar(pacienteId, null, null, null);
 
         assertThat(resultado).hasSize(1);
     }
@@ -677,7 +677,7 @@ class AgendamentoServiceTest {
         when(agendamentoRepository.findAllByStatus(StatusAgendamento.CANCELADO))
                 .thenReturn(List.of());
 
-        var resultado = service.listar(null, StatusAgendamento.CANCELADO, null);
+        var resultado = service.listar(null, StatusAgendamento.CANCELADO, null, null);
 
         assertThat(resultado).isEmpty();
     }
@@ -688,9 +688,26 @@ class AgendamentoServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         when(agendamentoRepository.findAll()).thenReturn(List.of());
 
-        var resultado = service.listar(null, null, null);
+        var resultado = service.listar(null, null, null, null);
 
         assertThat(resultado).isEmpty();
+    }
+
+    @Test
+    void deveFiltrarPorDataQuandoDataInformada() {
+        UUID medicoId = UUID.randomUUID();
+        var hoje = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.PRESENCIAL);
+        hoje.setDataHoraInicio(OffsetDateTime.now(ZoneId.of("America/Sao_Paulo")));
+        var ontem = novoAgendamento(medicoId, UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.PRESENCIAL);
+        ontem.setDataHoraInicio(hoje.getDataHoraInicio().minusDays(1));
+        when(contextoSeguranca.isMedico()).thenReturn(false);
+        when(contextoSeguranca.isPaciente()).thenReturn(false);
+        when(agendamentoRepository.findAllByMedicoId(medicoId)).thenReturn(List.of(hoje, ontem));
+
+        var resultado = service.listar(null, null, medicoId,
+                hoje.getDataHoraInicio().atZoneSameInstant(ZoneId.of("America/Sao_Paulo")).toLocalDate());
+
+        assertThat(resultado).hasSize(1);
     }
 
     // ---------- atualizarStatus ----------

@@ -219,7 +219,7 @@ public class AgendamentoService {
     }
 
     @Transactional(readOnly = true)
-    public List<AgendamentoResponse> listar(UUID pacienteId, StatusAgendamento status, UUID medicoId) {
+    public List<AgendamentoResponse> listar(UUID pacienteId, StatusAgendamento status, UUID medicoId, LocalDate data) {
         if (contextoSeguranca.isMedico()) {
             medicoId = contextoSeguranca.getReferenciaId();
         } else if (contextoSeguranca.isPaciente()) {
@@ -244,6 +244,12 @@ public class AgendamentoService {
             resultado = agendamentoRepository.findAllByStatus(status);
         } else {
             resultado = agendamentoRepository.findAll();
+        }
+
+        if (data != null) {
+            resultado = resultado.stream()
+                    .filter(a -> a.getDataHoraInicio().atZoneSameInstant(ZONA).toLocalDate().equals(data))
+                    .toList();
         }
 
         return resultado.stream().map(this::toResponse).toList();

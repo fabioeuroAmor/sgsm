@@ -156,7 +156,7 @@ public class PacienteService {
         var paciente = repository.findById(id)
                 .map(p -> modelMapper.map(p, PacienteResponse.class))
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Paciente não encontrado: " + id));
-        var agendamentos = agendamentoService.listar(id, null, null);
+        var agendamentos = agendamentoService.listar(id, null, null, null);
         auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.EXPORTACAO);
         return new PacienteExportacaoResponse(paciente, agendamentos);
     }
