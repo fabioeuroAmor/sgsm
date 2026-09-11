@@ -146,6 +146,11 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<!-- APM Glowroot: agente anexado automaticamente no "mvn spring-boot:run".
+					     UI standalone deste servico em http://localhost:4000 -->
+					<jvmArguments>-javaagent:C:/AmbienteDev/glowroot/glowroot/glowroot.jar -Dglowroot.conf.dir=C:/AmbienteDev/glowroot/data/sgsm -Dglowroot.data.dir=C:/AmbienteDev/glowroot/data/sgsm -Dglowroot.log.dir=C:/AmbienteDev/glowroot/data/sgsm -Dglowroot.tmp.dir=C:/AmbienteDev/glowroot/data/sgsm</jvmArguments>
+				</configuration>
 			</plugin>
 			<!--<plugin>
 				<groupId>org.owasp</groupId>
