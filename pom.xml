@@ -128,6 +128,17 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
+
+		<!-- Observabilidade: log estruturado (JSON) + tracing distribuido (traceId/spanId
+		     propagados via header traceparent, e injetados automaticamente no MDC) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-zipkin</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -135,6 +146,11 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<!-- APM Glowroot: agente anexado automaticamente no "mvn spring-boot:run".
+					     UI standalone deste servico em http://localhost:4000 -->
+					<jvmArguments>-javaagent:C:/AmbienteDev/glowroot/glowroot/glowroot.jar -Dglowroot.conf.dir=C:/AmbienteDev/glowroot/data/sgsm -Dglowroot.data.dir=C:/AmbienteDev/glowroot/data/sgsm -Dglowroot.log.dir=C:/AmbienteDev/glowroot/data/sgsm -Dglowroot.tmp.dir=C:/AmbienteDev/glowroot/data/sgsm</jvmArguments>
+				</configuration>
 			</plugin>
 			<!--<plugin>
 				<groupId>org.owasp</groupId>

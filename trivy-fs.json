@@ -1,0 +1,300 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.73.0"
+  },
+  "ReportID": "01a06059-0e27-7c07-8a3b-0d82bf25c9a4",
+  "CreatedAt": "2026-09-02T04:20:44.199790439Z",
+  "ArtifactID": "sha256:dd15b43808dd7534f09b50ebfb5a365692e85c062f0dab9d3b3f21a1a6a8633b",
+  "ArtifactName": "/workspace/sgsm",
+  "ArtifactType": "repository",
+  "Metadata": {
+    "RepoURL": "https://github.com/fabioeuroAmor/sgsm.git",
+    "Branch": "develop",
+    "Commit": "839c2724534f46ca828f90d3841dbd9b923d267e",
+    "CommitMsg": "Merge pull request #33 from fabioeuroAmor/feature/lgpd-formal-paciente\n\nfeat(lgpd): consentimento, exportacao, anonimizacao e expurgo (item 3 do compliance)",
+    "Author": "fabioeuroAmor \u003c67207055+fabioeuroAmor@users.noreply.github.com\u003e",
+    "Committer": "GitHub \u003cnoreply@github.com\u003e"
+  },
+  "Results": [
+    {
+      "Target": "pom.xml",
+      "Class": "lang-pkgs",
+      "Type": "pom",
+      "Packages": [
+        {
+          "ID": "br.com.sgsm:sgsm:0.0.1-SNAPSHOT::83f37068",
+          "Name": "br.com.sgsm:sgsm",
+          "Identifier": {
+            "PURL": "pkg:maven/br.com.sgsm/sgsm@0.0.1-SNAPSHOT",
+            "UID": "5f1d4cf9eaf8390a"
+          },
+          "Version": "0.0.1-SNAPSHOT",
+          "Relationship": "root",
+          "DependsOn": [
+            "com.fasterxml.jackson.core:jackson-databind:2.22.1::c33d09c8",
+            "com.google.code.gson:gson:2.13.1::482b3022",
+            "io.jsonwebtoken:jjwt-api:0.12.6::7dfe31fa",
+            "io.jsonwebtoken:jjwt-impl:0.12.6::7742a4ae",
+            "io.jsonwebtoken:jjwt-jackson:0.12.6::e3062060",
+            "org.modelmapper:modelmapper:2.4.4::adf6eeba",
+            "org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3::a70ec35b"
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "com.fasterxml.jackson.core:jackson-databind:2.22.1::c33d09c8",
+          "Name": "com.fasterxml.jackson.core:jackson-databind",
+          "Identifier": {
+            "PURL": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.1",
+            "UID": "7171fa7e55c2a998"
+          },
+          "Version": "2.22.1",
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 115,
+              "EndLine": 119
+            }
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "com.google.code.gson:gson:2.13.1::482b3022",
+          "Name": "com.google.code.gson:gson",
+          "Identifier": {
+            "PURL": "pkg:maven/com.google.code.gson/gson@2.13.1",
+            "UID": "82336dec68f608f6"
+          },
+          "Version": "2.13.1",
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 103,
+              "EndLine": 107
+            }
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "io.jsonwebtoken:jjwt-api:0.12.6::7dfe31fa",
+          "Name": "io.jsonwebtoken:jjwt-api",
+          "Identifier": {
+            "PURL": "pkg:maven/io.jsonwebtoken/jjwt-api@0.12.6",
+            "UID": "4211bb0f6d9bafc7"
+          },
+          "Version": "0.12.6",
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 68,
+              "EndLine": 72
+            }
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "io.jsonwebtoken:jjwt-impl:0.12.6::7742a4ae",
+          "Name": "io.jsonwebtoken:jjwt-impl",
+          "Identifier": {
+            "PURL": "pkg:maven/io.jsonwebtoken/jjwt-impl@0.12.6",
+            "UID": "8d6b2e65de0824c7"
+          },
+          "Version": "0.12.6",
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 73,
+              "EndLine": 78
+            }
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "io.jsonwebtoken:jjwt-jackson:0.12.6::e3062060",
+          "Name": "io.jsonwebtoken:jjwt-jackson",
+          "Identifier": {
+            "PURL": "pkg:maven/io.jsonwebtoken/jjwt-jackson@0.12.6",
+            "UID": "25a369cf22645eef"
+          },
+          "Version": "0.12.6",
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 79,
+              "EndLine": 84
+            }
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "org.modelmapper:modelmapper:2.4.4::adf6eeba",
+          "Name": "org.modelmapper:modelmapper",
+          "Identifier": {
+            "PURL": "pkg:maven/org.modelmapper/modelmapper@2.4.4",
+            "UID": "d37f922c1059520"
+          },
+          "Version": "2.4.4",
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 95,
+              "EndLine": 99
+            }
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "org.postgresql:postgresql::5904d59e",
+          "Name": "org.postgresql:postgresql",
+          "Identifier": {
+            "PURL": "pkg:maven/org.postgresql/postgresql",
+            "UID": "53bc684844c6f76b"
+          },
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 45,
+              "EndLine": 49
+            }
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3::a70ec35b",
+          "Name": "org.springdoc:springdoc-openapi-starter-webmvc-ui",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@3.0.3",
+            "UID": "cfc44cc64ab39b80"
+          },
+          "Version": "3.0.3",
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 120,
+              "EndLine": 124
+            }
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "org.springframework.boot:spring-boot-starter-data-jpa::e85ff8a3",
+          "Name": "org.springframework.boot:spring-boot-starter-data-jpa",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa",
+            "UID": "c900469f25c498d8"
+          },
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 36,
+              "EndLine": 39
+            }
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "org.springframework.boot:spring-boot-starter-data-redis::2780d8a3",
+          "Name": "org.springframework.boot:spring-boot-starter-data-redis",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis",
+            "UID": "5bd22892b739fdb"
+          },
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 127,
+              "EndLine": 130
+            }
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "org.springframework.boot:spring-boot-starter-security::677f847d",
+          "Name": "org.springframework.boot:spring-boot-starter-security",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.boot/spring-boot-starter-security",
+            "UID": "a4154118cab1137e"
+          },
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 62,
+              "EndLine": 65
+            }
+          ],
+          "AnalyzedBy": "pom"
+        },
+        {
+          "ID": "org.springframework.boot:spring-boot-starter-webmvc::59dcd657",
+          "Name": "org.springframework.boot:spring-boot-starter-webmvc",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.boot/spring-boot-starter-webmvc",
+            "UID": "aaf8d0c3bd7fab56"
+          },
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 40,
+              "EndLine": 43
+            }
+          ],
+          "AnalyzedBy": "pom"
+        }
+      ]
+    },
+    {
+      "Target": "Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {
+        "Successes": 25,
+        "Failures": 2
+      },
+      "Misconfigurations": [
+        {
+          "Type": "Dockerfile Security Check",
+          "ID": "DS-0002",
+          "Title": "Image user should not be 'root'",
+          "Description": "Running containers with 'root' user can lead to a container escape situation. It is a best practice to run containers as non-root users, which can be done by adding a 'USER' statement to the Dockerfile.",
+          "Message": "Specify at least 1 USER command in Dockerfile with non-root user as argument",
+          "Namespace": "builtin.dockerfile.DS002",
+          "Query": "data.builtin.dockerfile.DS002.deny",
+          "Resolution": "Add 'USER \u003cnon root user name\u003e' line to the Dockerfile",
+          "Severity": "HIGH",
+          "PrimaryURL": "https://avd.aquasec.com/misconfig/ds-0002",
+          "References": [
+            "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/",
+            "https://avd.aquasec.com/misconfig/ds-0002"
+          ],
+          "Status": "FAIL",
+          "CauseMetadata": {
+            "Provider": "Dockerfile",
+            "Service": "general"
+          }
+        },
+        {
+          "Type": "Dockerfile Security Check",
+          "ID": "DS-0026",
+          "Title": "No HEALTHCHECK defined",
+          "Description": "You should add HEALTHCHECK instruction in your docker container images to perform the health check on running containers.",
+          "Message": "Add HEALTHCHECK instruction in your Dockerfile",
+          "Namespace": "builtin.dockerfile.DS026",
+          "Query": "data.builtin.dockerfile.DS026.deny",
+          "Resolution": "Add HEALTHCHECK instruction in Dockerfile",
+          "Severity": "LOW",
+          "PrimaryURL": "https://avd.aquasec.com/misconfig/ds-0026",
+          "References": [
+            "https://blog.aquasec.com/docker-security-best-practices",
+            "https://avd.aquasec.com/misconfig/ds-0026"
+          ],
+          "Status": "FAIL",
+          "CauseMetadata": {
+            "Provider": "Dockerfile",
+            "Service": "general"
+          }
+        }
+      ]
+    }
+  ]
+}

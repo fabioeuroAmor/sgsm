@@ -105,9 +105,9 @@ class AgendamentoControllerTest {
         UUID pacienteId = UUID.randomUUID();
         UUID medicoId = UUID.randomUUID();
         var resposta = new AgendamentoResponse();
-        when(service.listar(pacienteId, StatusAgendamento.PENDENTE, medicoId)).thenReturn(List.of(resposta));
+        when(service.listar(pacienteId, StatusAgendamento.PENDENTE, medicoId, null)).thenReturn(List.of(resposta));
 
-        var response = controller.listar(pacienteId, StatusAgendamento.PENDENTE, medicoId);
+        var response = controller.listar(pacienteId, StatusAgendamento.PENDENTE, medicoId, null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsExactly(resposta);

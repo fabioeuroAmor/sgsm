@@ -319,7 +319,7 @@ class PacienteServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(true);
         when(contextoSeguranca.getReferenciaId()).thenReturn(id);
         when(repository.findById(id)).thenReturn(Optional.of(novoPaciente()));
-        when(agendamentoService.listar(id, null, null)).thenReturn(List.of());
+        when(agendamentoService.listar(id, null, null, null)).thenReturn(List.of());
 
         var response = service.exportar(id);
 
@@ -334,7 +334,7 @@ class PacienteServiceTest {
         when(contextoSeguranca.isPaciente()).thenReturn(false);
         when(contextoSeguranca.isDesenvolvedor()).thenReturn(true);
         when(repository.findById(id)).thenReturn(Optional.of(novoPaciente()));
-        when(agendamentoService.listar(id, null, null)).thenReturn(List.of());
+        when(agendamentoService.listar(id, null, null, null)).thenReturn(List.of());
 
         var response = service.exportar(id);
 

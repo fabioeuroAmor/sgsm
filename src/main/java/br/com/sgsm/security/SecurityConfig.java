@@ -32,9 +32,6 @@ public class SecurityConfig {
                 // forward interno pra cá, que reentra na cadeia de segurança sem token válido —
                 // sem isso, o forward era barrado com 403 e sobrescrevia o 401 original.
                 .requestMatchers("/error").permitAll()
-                // Auto-cadastro publico: novo medico/paciente cria seu perfil antes de autenticar
-                .requestMatchers(HttpMethod.POST, "/v1/api/medicos").permitAll()
-                .requestMatchers(HttpMethod.POST, "/v1/api/pacientes").permitAll()
                 // Medicos: MEDICO so ve a si mesmo; FUNCIONARIO e DESENVOLVEDOR veem todos;
                 // PACIENTE precisa listar para escolher medico/servico no agendamento
                 .requestMatchers(HttpMethod.GET, "/v1/api/medicos/**")
