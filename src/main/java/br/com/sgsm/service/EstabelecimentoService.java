@@ -8,6 +8,7 @@ import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.EstabelecimentoRepository;
 import br.com.sgsm.repository.MedicoEstabelecimentoRepository;
 import br.com.sgsm.repository.MedicoRepository;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,20 +25,25 @@ public class EstabelecimentoService {
     private final MedicoRepository medicoRepository;
     private final ModelMapper modelMapper;
     private final VetorizacaoPublisher vetorizacaoPublisher;
+    private final EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     public EstabelecimentoService(
             EstabelecimentoRepository repository,
             MedicoEstabelecimentoRepository medicoEstabelecimentoRepository,
             MedicoRepository medicoRepository,
             ModelMapper modelMapper,
-            VetorizacaoPublisher vetorizacaoPublisher) {
+            VetorizacaoPublisher vetorizacaoPublisher,
+            EstabelecimentoAcessoService estabelecimentoAcessoService) {
         this.repository = repository;
         this.medicoEstabelecimentoRepository = medicoEstabelecimentoRepository;
         this.medicoRepository = medicoRepository;
         this.modelMapper = modelMapper;
         this.vetorizacaoPublisher = vetorizacaoPublisher;
+        this.estabelecimentoAcessoService = estabelecimentoAcessoService;
     }
 
+    // Cadastrar um estabelecimento novo nao e acao sobre um estabelecimento
+    // existente - nao ha dono ainda, entao nao ha o que escopar aqui.
     public EstabelecimentoResponse cadastrar(CadastrarEstabelecimentoRequest request) {
         if (repository.existsByCnpj(request.cnpj())) {
             throw new IllegalArgumentException("CNPJ já cadastrado: " + request.cnpj());
@@ -52,12 +58,14 @@ public class EstabelecimentoService {
 
     @Transactional(readOnly = true)
     public EstabelecimentoResponse consultar(UUID id) {
+        estabelecimentoAcessoService.validarEstabelecimentoPermitido(id);
         return repository.findById(id)
                 .map(e -> modelMapper.map(e, EstabelecimentoResponse.class))
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Estabelecimento não encontrado: " + id));
     }
 
     public EstabelecimentoResponse atualizar(UUID id, AtualizarEstabelecimentoRequest request) {
+        estabelecimentoAcessoService.validarEstabelecimentoPermitido(id);
         var estabelecimento = buscarOuLancarErro(id);
         modelMapper.map(request, estabelecimento);
 
@@ -71,6 +79,7 @@ public class EstabelecimentoService {
     }
 
     public void remover(UUID id) {
+        estabelecimentoAcessoService.validarEstabelecimentoPermitido(id);
         var estabelecimento = buscarOuLancarErro(id);
         estabelecimento.setAtivo(false);
         var salvo = repository.save(estabelecimento);
@@ -78,6 +87,7 @@ public class EstabelecimentoService {
     }
 
     public EstabelecimentoResponse reativar(UUID id) {
+        estabelecimentoAcessoService.validarEstabelecimentoPermitido(id);
         var estabelecimento = buscarOuLancarErro(id);
         estabelecimento.setAtivo(true);
         var salvo = repository.save(estabelecimento);
@@ -93,6 +103,7 @@ public class EstabelecimentoService {
     @Transactional(readOnly = true)
     public List<EstabelecimentoResponse> listar(Boolean ativo, String uf, String cidade, UUID medicoId) {
         List<Estabelecimento> resultado;
+        List<UUID> permitidos = estabelecimentoAcessoService.estabelecimentosPermitidos();
 
         if (medicoId != null) {
             List<UUID> ids = medicoEstabelecimentoRepository
@@ -101,6 +112,19 @@ public class EstabelecimentoService {
                     .map(me -> me.getId().getEstabelecimentoId())
                     .toList();
             resultado = (List<Estabelecimento>) repository.findAllById(ids);
+            if (ativo != null) {
+                final Boolean filtroAtivo = ativo;
+                resultado = resultado.stream().filter(e -> filtroAtivo.equals(e.getAtivo())).toList();
+            }
+        } else if (permitidos != null) {
+            resultado = (List<Estabelecimento>) repository.findAllById(permitidos);
+            if (uf != null) {
+                final String filtroUf = uf.toUpperCase();
+                resultado = resultado.stream().filter(e -> filtroUf.equals(e.getUf())).toList();
+            }
+            if (cidade != null) {
+                resultado = resultado.stream().filter(e -> cidade.equals(e.getCidade())).toList();
+            }
             if (ativo != null) {
                 final Boolean filtroAtivo = ativo;
                 resultado = resultado.stream().filter(e -> filtroAtivo.equals(e.getAtivo())).toList();
@@ -131,6 +155,7 @@ public class EstabelecimentoService {
     // UC - Listar médicos vinculados ao estabelecimento
     @Transactional(readOnly = true)
     public List<MedicoResponse> listarMedicos(UUID estabelecimentoId) {
+        estabelecimentoAcessoService.validarEstabelecimentoPermitido(estabelecimentoId);
         buscarOuLancarErro(estabelecimentoId);
         return medicoEstabelecimentoRepository
                 .findById_EstabelecimentoIdAndAtivo(estabelecimentoId, true)
@@ -143,6 +168,7 @@ public class EstabelecimentoService {
 
     // UC - Associar médicos ao estabelecimento (substitui toda a lista)
     public void associarMedicos(UUID estabelecimentoId, AssociarMedicosRequest request) {
+        estabelecimentoAcessoService.validarEstabelecimentoPermitido(estabelecimentoId);
         buscarOuLancarErro(estabelecimentoId);
 
         request.medicoIds().forEach(medicoId ->

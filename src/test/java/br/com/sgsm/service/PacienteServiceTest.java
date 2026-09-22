@@ -14,6 +14,7 @@ import br.com.sgsm.repository.PacienteRepository;
 import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.security.ContextoSeguranca;
 import br.com.sgsm.security.CpfCryptoService;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,6 +48,8 @@ class PacienteServiceTest {
     private AuditoriaService auditoriaService;
     @Mock
     private AgendamentoService agendamentoService;
+    @Mock
+    private EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     private CpfCryptoService cpfCryptoService;
     private PacienteService service;
@@ -58,7 +61,10 @@ class PacienteServiceTest {
         cpfCryptoService = new CpfCryptoService(chaveAes, chaveHmac);
         service = new PacienteService(repository, agendamentoRepository,
                 new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher, auditoriaService,
-                cpfCryptoService, agendamentoService);
+                cpfCryptoService, agendamentoService, estabelecimentoAcessoService);
+        // Mockito retorna List vazia (nao null) para metodo List<> nao-stubado - sem isso,
+        // o service entenderia "escopado a zero medicos" em vez de "irrestrito".
+        lenient().when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(null);
     }
 
     private Paciente novoPaciente() {
@@ -457,5 +463,30 @@ class PacienteServiceTest {
         var resultado = service.listar(null);
 
         assertThat(resultado).hasSize(1);
+    }
+
+    @Test
+    void deveListarSoPacientesDosMedicosVinculadosQuandoEscopado() {
+        UUID medicoId = UUID.randomUUID();
+        var paciente = novoPaciente();
+        when(contextoSeguranca.isPaciente()).thenReturn(false);
+        when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(List.of(medicoId));
+        when(agendamentoRepository.findPacienteIdsDistintosByMedicoIdIn(List.of(medicoId)))
+                .thenReturn(List.of(paciente.getId()));
+        when(repository.findAllById(List.of(paciente.getId()))).thenReturn(List.of(paciente));
+
+        var resultado = service.listar(null);
+
+        assertThat(resultado).hasSize(1);
+    }
+
+    @Test
+    void deveRetornarVazioQuandoEscopadoSemMedicoVinculado() {
+        when(contextoSeguranca.isPaciente()).thenReturn(false);
+        when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(List.of());
+
+        var resultado = service.listar(null);
+
+        assertThat(resultado).isEmpty();
     }
 }

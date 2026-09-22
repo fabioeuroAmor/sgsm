@@ -9,6 +9,7 @@ import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.MedicoRepository;
 import br.com.sgsm.security.ContextoSeguranca;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +25,16 @@ public class MedicoService {
     private final ModelMapper modelMapper;
     private final ContextoSeguranca contextoSeguranca;
     private final VetorizacaoPublisher vetorizacaoPublisher;
+    private final EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     public MedicoService(MedicoRepository repository, ModelMapper modelMapper,
-                         ContextoSeguranca contextoSeguranca, VetorizacaoPublisher vetorizacaoPublisher) {
+                         ContextoSeguranca contextoSeguranca, VetorizacaoPublisher vetorizacaoPublisher,
+                         EstabelecimentoAcessoService estabelecimentoAcessoService) {
         this.repository = repository;
         this.modelMapper = modelMapper;
         this.contextoSeguranca = contextoSeguranca;
         this.vetorizacaoPublisher = vetorizacaoPublisher;
+        this.estabelecimentoAcessoService = estabelecimentoAcessoService;
     }
 
     public MedicoResponse cadastrar(CadastrarMedicoRequest request) {
@@ -103,8 +107,18 @@ public class MedicoService {
     @Transactional(readOnly = true)
     public List<MedicoResponse> listar(Boolean ativo, String especialidade) {
         List<Medico> resultado;
+        List<UUID> medicosPermitidos = estabelecimentoAcessoService.medicosPermitidos();
 
-        if (especialidade != null && ativo != null) {
+        if (medicosPermitidos != null) {
+            resultado = medicosPermitidos.isEmpty() ? List.of() : (List<Medico>) repository.findAllById(medicosPermitidos);
+            if (especialidade != null) {
+                resultado = resultado.stream().filter(m -> especialidade.equals(m.getEspecialidade())).toList();
+            }
+            if (ativo != null) {
+                final Boolean filtroAtivo = ativo;
+                resultado = resultado.stream().filter(m -> filtroAtivo.equals(m.getAtivo())).toList();
+            }
+        } else if (especialidade != null && ativo != null) {
             resultado = repository.findAllByEspecialidadeAndAtivo(especialidade, ativo);
         } else if (especialidade != null) {
             resultado = repository.findAllByEspecialidade(especialidade);

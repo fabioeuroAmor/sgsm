@@ -13,6 +13,7 @@ import br.com.sgsm.repository.EstabelecimentoRepository;
 import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.repository.MedicoEstabelecimentoRepository;
 import br.com.sgsm.repository.MedicoRepository;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,13 +40,19 @@ class EstabelecimentoServiceTest {
     private MedicoRepository medicoRepository;
     @Mock
     private VetorizacaoPublisher vetorizacaoPublisher;
+    @Mock
+    private EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     private EstabelecimentoService service;
 
     @BeforeEach
     void setUp() {
         service = new EstabelecimentoService(repository, medicoEstabelecimentoRepository,
-                medicoRepository, new ModelMapperConfig().modelMapper(), vetorizacaoPublisher);
+                medicoRepository, new ModelMapperConfig().modelMapper(), vetorizacaoPublisher,
+                estabelecimentoAcessoService);
+        // Mockito retorna List vazia (nao null) para metodo List<> nao-stubado - sem isso,
+        // o service entenderia "escopado a zero estabelecimentos" em vez de "irrestrito".
+        lenient().when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(null);
     }
 
     private Estabelecimento novoEstabelecimento() {
@@ -393,5 +400,54 @@ class EstabelecimentoServiceTest {
 
         assertThatThrownBy(() -> service.associarMedicos(estabelecimentoId, request))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    // ─── escopo por estabelecimento (FUNCIONARIO/ADMIN_ESTABELECIMENTO) ───────
+
+    @Test
+    void deveLancarExcecaoAoConsultarEstabelecimentoNaoPermitido() {
+        UUID id = UUID.randomUUID();
+        doThrow(new br.com.sgsm.exception.AcessoNegadoException("Acesso negado ao estabelecimento: " + id))
+                .when(estabelecimentoAcessoService).validarEstabelecimentoPermitido(id);
+
+        assertThatThrownBy(() -> service.consultar(id))
+                .isInstanceOf(br.com.sgsm.exception.AcessoNegadoException.class);
+    }
+
+    @Test
+    void deveLancarExcecaoAoAtualizarEstabelecimentoNaoPermitido() {
+        UUID id = UUID.randomUUID();
+        doThrow(new br.com.sgsm.exception.AcessoNegadoException("Acesso negado ao estabelecimento: " + id))
+                .when(estabelecimentoAcessoService).validarEstabelecimentoPermitido(id);
+        var request = new AtualizarEstabelecimentoRequest(
+                "x", null, null, null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.atualizar(id, request))
+                .isInstanceOf(br.com.sgsm.exception.AcessoNegadoException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deveListarSoEstabelecimentosPermitidosQuandoEscopado() {
+        UUID permitidoId = UUID.randomUUID();
+        var est = novoEstabelecimento();
+        when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(List.of(permitidoId));
+        when(repository.findAllById(List.of(permitidoId))).thenReturn(List.of(est));
+
+        var resultado = service.listar(null, null, null);
+
+        assertThat(resultado).hasSize(1);
+        verify(repository).findAllById(List.of(permitidoId));
+        verify(repository, never()).findAll();
+    }
+
+    @Test
+    void deveRetornarVazioQuandoEscopadoSemEstabelecimentoPermitido() {
+        when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(List.of());
+        when(repository.findAllById(List.of())).thenReturn(List.of());
+
+        var resultado = service.listar(null, null, null);
+
+        assertThat(resultado).isEmpty();
     }
 }

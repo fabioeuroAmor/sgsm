@@ -9,6 +9,7 @@ import br.com.sgsm.repository.AgendaMedicoRepository;
 import br.com.sgsm.repository.EstabelecimentoRepository;
 import br.com.sgsm.repository.MedicoRepository;
 import br.com.sgsm.security.ContextoSeguranca;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,16 +25,19 @@ public class AgendaMedicoService {
     private final MedicoRepository medicoRepository;
     private final EstabelecimentoRepository estabelecimentoRepository;
     private final ContextoSeguranca contextoSeguranca;
+    private final EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     public AgendaMedicoService(
             AgendaMedicoRepository agendaMedicoRepository,
             MedicoRepository medicoRepository,
             EstabelecimentoRepository estabelecimentoRepository,
-            ContextoSeguranca contextoSeguranca) {
+            ContextoSeguranca contextoSeguranca,
+            EstabelecimentoAcessoService estabelecimentoAcessoService) {
         this.agendaMedicoRepository = agendaMedicoRepository;
         this.medicoRepository = medicoRepository;
         this.estabelecimentoRepository = estabelecimentoRepository;
         this.contextoSeguranca = contextoSeguranca;
+        this.estabelecimentoAcessoService = estabelecimentoAcessoService;
     }
 
     @Transactional(readOnly = true)
@@ -100,6 +104,9 @@ public class AgendaMedicoService {
         UUID ref = contextoSeguranca.getReferenciaId();
         if (contextoSeguranca.isMedico() && !medicoId.equals(ref)) {
             throw new AcessoNegadoException("Médico não pode gerenciar agenda de outro médico: " + medicoId);
+        }
+        if (!contextoSeguranca.isMedico() && !estabelecimentoAcessoService.medicoPermitido(medicoId)) {
+            throw new AcessoNegadoException("Médico não vinculado a estabelecimento permitido: " + medicoId);
         }
     }
 

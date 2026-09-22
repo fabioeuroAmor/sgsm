@@ -7,6 +7,7 @@ import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.security.ContextoSeguranca;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.repository.ServicoMedicoRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,12 +35,15 @@ class ServicoMedicoServiceTest {
     private VetorizacaoPublisher vetorizacaoPublisher;
     @Mock
     private ContextoSeguranca contextoSeguranca;
+    @Mock
+    private EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     private ServicoMedicoService service;
 
     @BeforeEach
     void setUp() {
-        service = new ServicoMedicoService(repository, new br.com.sgsm.config.ModelMapperConfig().modelMapper(), vetorizacaoPublisher, contextoSeguranca);
+        service = new ServicoMedicoService(repository, new br.com.sgsm.config.ModelMapperConfig().modelMapper(),
+                vetorizacaoPublisher, contextoSeguranca, estabelecimentoAcessoService);
     }
 
     private ServicoMedico novoServico() {
@@ -98,6 +102,7 @@ class ServicoMedicoServiceTest {
         var servico = novoServico();
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(estabelecimentoAcessoService.medicoPermitido(servico.getMedicoId())).thenReturn(true);
         when(repository.save(any(ServicoMedico.class))).thenAnswer(inv -> {
             var e = inv.getArgument(0);
             ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
@@ -160,6 +165,7 @@ class ServicoMedicoServiceTest {
         var servico = novoServico();
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(estabelecimentoAcessoService.medicoPermitido(servico.getMedicoId())).thenReturn(true);
         when(repository.save(servico)).thenReturn(servico);
 
         service.remover(id);
@@ -211,6 +217,7 @@ class ServicoMedicoServiceTest {
         servico.setAtivo(false);
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(estabelecimentoAcessoService.medicoPermitido(servico.getMedicoId())).thenReturn(true);
         when(repository.save(servico)).thenReturn(servico);
 
         var response = service.reativar(id);
@@ -298,5 +305,18 @@ class ServicoMedicoServiceTest {
 
         assertThat(resultado).hasSize(2);
         verify(repository).findAll();
+    }
+
+    @Test
+    void deveNegarAtualizacaoQuandoStaffSemVinculoComOMedicoDoServico() {
+        var servico = novoServico();
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(Optional.of(servico));
+        when(estabelecimentoAcessoService.medicoPermitido(servico.getMedicoId())).thenReturn(false);
+        var request = new AtualizarServicoMedicoRequest("x", null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.atualizar(id, request))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(repository, never()).save(any());
     }
 }

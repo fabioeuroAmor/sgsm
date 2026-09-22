@@ -11,6 +11,7 @@ import br.com.sgsm.repository.AgendaMedicoRepository;
 import br.com.sgsm.repository.EstabelecimentoRepository;
 import br.com.sgsm.repository.MedicoRepository;
 import br.com.sgsm.security.ContextoSeguranca;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,12 +39,15 @@ class AgendaMedicoServiceTest {
     private EstabelecimentoRepository estabelecimentoRepository;
     @Mock
     private ContextoSeguranca contextoSeguranca;
+    @Mock
+    private EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     private AgendaMedicoService service;
 
     @BeforeEach
     void setUp() {
-        service = new AgendaMedicoService(agendaMedicoRepository, medicoRepository, estabelecimentoRepository, contextoSeguranca);
+        service = new AgendaMedicoService(agendaMedicoRepository, medicoRepository, estabelecimentoRepository,
+                contextoSeguranca, estabelecimentoAcessoService);
     }
 
     private CadastrarAgendaMedicoRequest requestPresencial(UUID medicoId, UUID estabelecimentoId) {
@@ -60,6 +64,7 @@ class AgendaMedicoServiceTest {
         agenda.setDiaSemana(DiaSemana.SEGUNDA);
         agenda.setHoraInicio(java.time.LocalTime.of(8, 0));
         agenda.setHoraFim(java.time.LocalTime.of(12, 0));
+        when(estabelecimentoAcessoService.medicoPermitido(medicoId)).thenReturn(true);
         when(agendaMedicoRepository.findByMedicoIdOrderByDiaSemanaAscHoraInicioAsc(medicoId))
                 .thenReturn(List.of(agenda));
 
@@ -79,6 +84,7 @@ class AgendaMedicoServiceTest {
         agenda.setDiaSemana(DiaSemana.SEGUNDA);
         agenda.setHoraInicio(java.time.LocalTime.of(8, 0));
         agenda.setHoraFim(java.time.LocalTime.of(12, 0));
+        when(estabelecimentoAcessoService.medicoPermitido(medicoId)).thenReturn(true);
         when(agendaMedicoRepository.findByMedicoIdOrderByDiaSemanaAscHoraInicioAsc(medicoId))
                 .thenReturn(List.of(agenda));
         var estabelecimento = new Estabelecimento();
@@ -118,6 +124,7 @@ class AgendaMedicoServiceTest {
     void deveCadastrarAgendaPresencialQuandoDadosValidos() {
         UUID medicoId = UUID.randomUUID();
         UUID estabelecimentoId = UUID.randomUUID();
+        when(estabelecimentoAcessoService.medicoPermitido(medicoId)).thenReturn(true);
         when(medicoRepository.findById(medicoId)).thenReturn(Optional.of(new Medico()));
         when(estabelecimentoRepository.findById(estabelecimentoId)).thenReturn(Optional.of(new Estabelecimento()));
         when(agendaMedicoRepository.save(any(AgendaMedico.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -132,6 +139,7 @@ class AgendaMedicoServiceTest {
     @Test
     void deveCadastrarAgendaDomiciliarSemEstabelecimento() {
         UUID medicoId = UUID.randomUUID();
+        when(estabelecimentoAcessoService.medicoPermitido(medicoId)).thenReturn(true);
         when(medicoRepository.findById(medicoId)).thenReturn(Optional.of(new Medico()));
         when(agendaMedicoRepository.save(any(AgendaMedico.class))).thenAnswer(inv -> inv.getArgument(0));
         var request = new CadastrarAgendaMedicoRequest(
@@ -159,6 +167,7 @@ class AgendaMedicoServiceTest {
     @Test
     void deveLancarExcecaoAoCadastrarComMedicoInexistente() {
         UUID medicoId = UUID.randomUUID();
+        when(estabelecimentoAcessoService.medicoPermitido(medicoId)).thenReturn(true);
         when(medicoRepository.findById(medicoId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.cadastrar(requestPresencial(medicoId, UUID.randomUUID())))
@@ -168,6 +177,7 @@ class AgendaMedicoServiceTest {
     @Test
     void deveLancarExcecaoQuandoAgendaPresencialSemEstabelecimento() {
         UUID medicoId = UUID.randomUUID();
+        when(estabelecimentoAcessoService.medicoPermitido(medicoId)).thenReturn(true);
         when(medicoRepository.findById(medicoId)).thenReturn(Optional.of(new Medico()));
         var request = new CadastrarAgendaMedicoRequest(
                 medicoId, null, DiaSemana.SEGUNDA, "08:00", "12:00",
@@ -182,6 +192,7 @@ class AgendaMedicoServiceTest {
     void deveLancarExcecaoQuandoEstabelecimentoInexistente() {
         UUID medicoId = UUID.randomUUID();
         UUID estabelecimentoId = UUID.randomUUID();
+        when(estabelecimentoAcessoService.medicoPermitido(medicoId)).thenReturn(true);
         when(medicoRepository.findById(medicoId)).thenReturn(Optional.of(new Medico()));
         when(estabelecimentoRepository.findById(estabelecimentoId)).thenReturn(Optional.empty());
 
@@ -193,6 +204,7 @@ class AgendaMedicoServiceTest {
     void deveLancarExcecaoQuandoHoraFimNaoPosteriorAHoraInicio() {
         UUID medicoId = UUID.randomUUID();
         UUID estabelecimentoId = UUID.randomUUID();
+        when(estabelecimentoAcessoService.medicoPermitido(medicoId)).thenReturn(true);
         when(medicoRepository.findById(medicoId)).thenReturn(Optional.of(new Medico()));
         when(estabelecimentoRepository.findById(estabelecimentoId)).thenReturn(Optional.of(new Estabelecimento()));
         var request = new CadastrarAgendaMedicoRequest(
@@ -208,6 +220,7 @@ class AgendaMedicoServiceTest {
     void deveLancarExcecaoQuandoDuracaoSlotMenorQueMinimo() {
         UUID medicoId = UUID.randomUUID();
         UUID estabelecimentoId = UUID.randomUUID();
+        when(estabelecimentoAcessoService.medicoPermitido(medicoId)).thenReturn(true);
         when(medicoRepository.findById(medicoId)).thenReturn(Optional.of(new Medico()));
         when(estabelecimentoRepository.findById(estabelecimentoId)).thenReturn(Optional.of(new Estabelecimento()));
         var request = new CadastrarAgendaMedicoRequest(
@@ -223,6 +236,7 @@ class AgendaMedicoServiceTest {
     void deveLancarExcecaoQuandoDuracaoSlotNula() {
         UUID medicoId = UUID.randomUUID();
         UUID estabelecimentoId = UUID.randomUUID();
+        when(estabelecimentoAcessoService.medicoPermitido(medicoId)).thenReturn(true);
         when(medicoRepository.findById(medicoId)).thenReturn(Optional.of(new Medico()));
         when(estabelecimentoRepository.findById(estabelecimentoId)).thenReturn(Optional.of(new Estabelecimento()));
         var request = new CadastrarAgendaMedicoRequest(
@@ -238,6 +252,7 @@ class AgendaMedicoServiceTest {
         UUID id = UUID.randomUUID();
         var agenda = new AgendaMedico();
         when(agendaMedicoRepository.findById(id)).thenReturn(Optional.of(agenda));
+        when(estabelecimentoAcessoService.medicoPermitido(null)).thenReturn(true);
 
         service.remover(id);
 

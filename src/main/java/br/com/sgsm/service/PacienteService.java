@@ -14,6 +14,7 @@ import br.com.sgsm.repository.AgendamentoRepository;
 import br.com.sgsm.repository.PacienteRepository;
 import br.com.sgsm.security.ContextoSeguranca;
 import br.com.sgsm.security.CpfCryptoService;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ public class PacienteService {
     private final AuditoriaService auditoriaService;
     private final CpfCryptoService cpfCryptoService;
     private final AgendamentoService agendamentoService;
+    private final EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     public PacienteService(PacienteRepository repository,
                            AgendamentoRepository agendamentoRepository,
@@ -43,7 +45,8 @@ public class PacienteService {
                            VetorizacaoPublisher vetorizacaoPublisher,
                            AuditoriaService auditoriaService,
                            CpfCryptoService cpfCryptoService,
-                           AgendamentoService agendamentoService) {
+                           AgendamentoService agendamentoService,
+                           EstabelecimentoAcessoService estabelecimentoAcessoService) {
         this.repository = repository;
         this.agendamentoRepository = agendamentoRepository;
         this.modelMapper = modelMapper;
@@ -52,6 +55,7 @@ public class PacienteService {
         this.auditoriaService = auditoriaService;
         this.cpfCryptoService = cpfCryptoService;
         this.agendamentoService = agendamentoService;
+        this.estabelecimentoAcessoService = estabelecimentoAcessoService;
     }
 
     // UC - Cadastrar paciente
@@ -205,6 +209,26 @@ public class PacienteService {
                     .map(p -> List.of(modelMapper.map(p, PacienteResponse.class)))
                     .orElse(List.of());
         }
+
+        // FUNCIONARIO/ADMIN_ESTABELECIMENTO: só pacientes atendidos por médico vinculado
+        // ao(s) estabelecimento(s) do staff - via Agendamento.medicoId, não
+        // Agendamento.estabelecimentoId (que fica nulo em agendamento domiciliar), pra
+        // incluir paciente atendido só em domicílio por um médico da clínica.
+        List<UUID> medicosPermitidos = estabelecimentoAcessoService.medicosPermitidos();
+        if (medicosPermitidos != null) {
+            List<Paciente> resultado = medicosPermitidos.isEmpty()
+                    ? List.of()
+                    : repository.findAllById(agendamentoRepository.findPacienteIdsDistintosByMedicoIdIn(medicosPermitidos))
+                            .stream().toList();
+            if (ativo != null) {
+                final Boolean filtroAtivo = ativo;
+                resultado = resultado.stream().filter(p -> filtroAtivo.equals(p.getAtivo())).toList();
+            }
+            return resultado.stream()
+                    .map(p -> modelMapper.map(p, PacienteResponse.class))
+                    .toList();
+        }
+
         List<Paciente> resultado = (ativo != null)
                 ? repository.findAllByAtivo(ativo)
                 : repository.findAll();

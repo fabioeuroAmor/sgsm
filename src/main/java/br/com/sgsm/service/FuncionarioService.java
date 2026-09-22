@@ -1,7 +1,6 @@
 package br.com.sgsm.service;
 
 import br.com.sgsm.domain.Funcionario;
-import br.com.sgsm.domain.MedicoEstabelecimento;
 import br.com.sgsm.dto.AtualizarFuncionarioRequest;
 import br.com.sgsm.dto.CadastrarFuncionarioRequest;
 import br.com.sgsm.dto.FuncionarioResponse;
@@ -9,8 +8,7 @@ import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.EstabelecimentoRepository;
 import br.com.sgsm.repository.FuncionarioRepository;
-import br.com.sgsm.repository.MedicoEstabelecimentoRepository;
-import br.com.sgsm.security.ContextoSeguranca;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,29 +22,24 @@ public class FuncionarioService {
 
     private final FuncionarioRepository repository;
     private final EstabelecimentoRepository estabelecimentoRepository;
-    private final MedicoEstabelecimentoRepository medicoEstabelecimentoRepository;
     private final ModelMapper modelMapper;
-    private final ContextoSeguranca contextoSeguranca;
+    private final EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     public FuncionarioService(FuncionarioRepository repository,
                               EstabelecimentoRepository estabelecimentoRepository,
-                              MedicoEstabelecimentoRepository medicoEstabelecimentoRepository,
                               ModelMapper modelMapper,
-                              ContextoSeguranca contextoSeguranca) {
+                              EstabelecimentoAcessoService estabelecimentoAcessoService) {
         this.repository = repository;
         this.estabelecimentoRepository = estabelecimentoRepository;
-        this.medicoEstabelecimentoRepository = medicoEstabelecimentoRepository;
         this.modelMapper = modelMapper;
-        this.contextoSeguranca = contextoSeguranca;
+        this.estabelecimentoAcessoService = estabelecimentoAcessoService;
     }
 
     public FuncionarioResponse cadastrar(CadastrarFuncionarioRequest request) {
         if (!estabelecimentoRepository.existsById(request.estabelecimentoId())) {
             throw new RecursoNaoEncontradoException("Estabelecimento não encontrado: " + request.estabelecimentoId());
         }
-        if (contextoSeguranca.isMedico()) {
-            validarEstabelecimentoDoMedico(request.estabelecimentoId());
-        }
+        estabelecimentoAcessoService.validarEstabelecimentoPermitido(request.estabelecimentoId());
         if (repository.existsByCpf(request.cpf())) {
             throw new IllegalArgumentException("CPF já cadastrado: " + request.cpf());
         }
@@ -61,25 +54,18 @@ public class FuncionarioService {
     @Transactional(readOnly = true)
     public FuncionarioResponse consultar(UUID id) {
         var funcionario = buscarOuLancarErro(id);
-        if (contextoSeguranca.isMedico()) {
-            validarEstabelecimentoDoMedico(funcionario.getEstabelecimentoId());
-        }
+        estabelecimentoAcessoService.validarEstabelecimentoPermitido(funcionario.getEstabelecimentoId());
         return modelMapper.map(funcionario, FuncionarioResponse.class);
     }
 
     @Transactional(readOnly = true)
     public List<FuncionarioResponse> listar(UUID estabelecimentoId, Boolean ativo) {
         List<Funcionario> resultado;
+        List<UUID> permitidos = estabelecimentoAcessoService.estabelecimentosPermitidos();
 
-        if (contextoSeguranca.isMedico()) {
-            List<UUID> estabelecimentosDoMedico = medicoEstabelecimentoRepository
-                    .findById_MedicoIdAndAtivo(contextoSeguranca.getReferenciaId(), true)
-                    .stream()
-                    .map(me -> me.getId().getEstabelecimentoId())
-                    .toList();
-
+        if (permitidos != null) {
             if (estabelecimentoId != null) {
-                if (!estabelecimentosDoMedico.contains(estabelecimentoId)) {
+                if (!permitidos.contains(estabelecimentoId)) {
                     throw new AcessoNegadoException("Acesso negado ao estabelecimento: " + estabelecimentoId);
                 }
                 resultado = ativo != null
@@ -87,8 +73,8 @@ public class FuncionarioService {
                         : repository.findAllByEstabelecimentoId(estabelecimentoId);
             } else {
                 resultado = ativo != null
-                        ? repository.findAllByEstabelecimentoIdInAndAtivo(estabelecimentosDoMedico, ativo)
-                        : repository.findAllByEstabelecimentoIdIn(estabelecimentosDoMedico);
+                        ? repository.findAllByEstabelecimentoIdInAndAtivo(permitidos, ativo)
+                        : repository.findAllByEstabelecimentoIdIn(permitidos);
             }
         } else {
             if (estabelecimentoId != null) {
@@ -109,9 +95,7 @@ public class FuncionarioService {
 
     public FuncionarioResponse atualizar(UUID id, AtualizarFuncionarioRequest request) {
         var funcionario = buscarOuLancarErro(id);
-        if (contextoSeguranca.isMedico()) {
-            validarEstabelecimentoDoMedico(funcionario.getEstabelecimentoId());
-        }
+        estabelecimentoAcessoService.validarEstabelecimentoPermitido(funcionario.getEstabelecimentoId());
         if (request.email() != null && repository.existsByEmailAndIdNot(request.email(), id)) {
             throw new IllegalArgumentException("E-mail já cadastrado: " + request.email());
         }
@@ -121,18 +105,14 @@ public class FuncionarioService {
 
     public void remover(UUID id) {
         var funcionario = buscarOuLancarErro(id);
-        if (contextoSeguranca.isMedico()) {
-            validarEstabelecimentoDoMedico(funcionario.getEstabelecimentoId());
-        }
+        estabelecimentoAcessoService.validarEstabelecimentoPermitido(funcionario.getEstabelecimentoId());
         funcionario.setAtivo(false);
         repository.save(funcionario);
     }
 
     public FuncionarioResponse reativar(UUID id) {
         var funcionario = buscarOuLancarErro(id);
-        if (contextoSeguranca.isMedico()) {
-            validarEstabelecimentoDoMedico(funcionario.getEstabelecimentoId());
-        }
+        estabelecimentoAcessoService.validarEstabelecimentoPermitido(funcionario.getEstabelecimentoId());
         funcionario.setAtivo(true);
         return modelMapper.map(repository.save(funcionario), FuncionarioResponse.class);
     }
@@ -140,15 +120,5 @@ public class FuncionarioService {
     private Funcionario buscarOuLancarErro(UUID id) {
         return repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Funcionário não encontrado: " + id));
-    }
-
-    private void validarEstabelecimentoDoMedico(UUID estabelecimentoId) {
-        boolean vinculado = medicoEstabelecimentoRepository
-                .findById_MedicoIdAndAtivo(contextoSeguranca.getReferenciaId(), true)
-                .stream()
-                .anyMatch(me -> me.getId().getEstabelecimentoId().equals(estabelecimentoId));
-        if (!vinculado) {
-            throw new AcessoNegadoException("Estabelecimento não vinculado ao médico: " + estabelecimentoId);
-        }
     }
 }

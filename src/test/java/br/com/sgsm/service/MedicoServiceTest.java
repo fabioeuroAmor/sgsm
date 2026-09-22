@@ -10,6 +10,7 @@ import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.repository.MedicoRepository;
 import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.security.ContextoSeguranca;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,12 +35,18 @@ class MedicoServiceTest {
     private ContextoSeguranca contextoSeguranca;
     @Mock
     private VetorizacaoPublisher vetorizacaoPublisher;
+    @Mock
+    private EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     private MedicoService service;
 
     @BeforeEach
     void setUp() {
-        service = new MedicoService(repository, new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher);
+        service = new MedicoService(repository, new ModelMapperConfig().modelMapper(), contextoSeguranca,
+                vetorizacaoPublisher, estabelecimentoAcessoService);
+        // Mockito retorna List vazia (nao null) para metodo List<> nao-stubado - sem isso,
+        // o service entenderia "escopado a zero medicos" em vez de "irrestrito".
+        lenient().when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(null);
     }
 
     private Medico novoMedico() {
@@ -342,5 +349,25 @@ class MedicoServiceTest {
         var resultado = service.listar(null, null);
 
         assertThat(resultado).hasSize(1);
+    }
+
+    @Test
+    void deveListarSoMedicosPermitidosQuandoEscopado() {
+        var medico = novoMedico();
+        when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(List.of(medico.getId()));
+        when(repository.findAllById(List.of(medico.getId()))).thenReturn(List.of(medico));
+
+        var resultado = service.listar(null, null);
+
+        assertThat(resultado).hasSize(1);
+    }
+
+    @Test
+    void deveRetornarVazioQuandoEscopadoSemMedicoPermitido() {
+        when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(List.of());
+
+        var resultado = service.listar(null, null);
+
+        assertThat(resultado).isEmpty();
     }
 }

@@ -32,41 +32,47 @@ public class SecurityConfig {
                 // forward interno pra cá, que reentra na cadeia de segurança sem token válido —
                 // sem isso, o forward era barrado com 403 e sobrescrevia o 401 original.
                 .requestMatchers("/error").permitAll()
-                // Medicos: MEDICO so ve a si mesmo; FUNCIONARIO e DESENVOLVEDOR veem todos;
-                // PACIENTE precisa listar para escolher medico/servico no agendamento
+                // Medicos: MEDICO so ve a si mesmo; FUNCIONARIO, ADMIN_ESTABELECIMENTO e
+                // DESENVOLVEDOR veem todos (escopados por estabelecimento no Service,
+                // exceto DESENVOLVEDOR); PACIENTE precisa listar para escolher medico/
+                // servico no agendamento
                 .requestMatchers(HttpMethod.GET, "/v1/api/medicos/**")
-                    .hasAnyRole("PACIENTE", "MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                    .hasAnyRole("PACIENTE", "MEDICO", "FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
                 .requestMatchers(HttpMethod.POST, "/v1/api/medicos/**")
-                    .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR")
+                    .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
                 .requestMatchers(HttpMethod.PUT, "/v1/api/medicos/**")
-                    .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                    .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
                 .requestMatchers(HttpMethod.DELETE, "/v1/api/medicos/**")
-                    .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                    .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
                 .requestMatchers(HttpMethod.PATCH, "/v1/api/medicos/**")
-                    .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
-                // Pacientes: leitura para todos os roles; escrita apenas para PACIENTE (próprios dados), FUNCIONARIO e DESENVOLVEDOR
+                    .hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
+                // Pacientes: leitura para todos os roles; escrita apenas para PACIENTE (próprios dados), FUNCIONARIO, ADMIN_ESTABELECIMENTO e DESENVOLVEDOR
                 .requestMatchers(HttpMethod.GET, "/v1/api/pacientes/**")
-                    .hasAnyRole("PACIENTE", "MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                    .hasAnyRole("PACIENTE", "MEDICO", "FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
                 .requestMatchers(HttpMethod.POST, "/v1/api/pacientes/**")
-                    .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR")
+                    .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
                 .requestMatchers(HttpMethod.PUT, "/v1/api/pacientes/**")
-                    .hasAnyRole("PACIENTE", "FUNCIONARIO", "DESENVOLVEDOR")
+                    .hasAnyRole("PACIENTE", "FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
                 .requestMatchers(HttpMethod.DELETE, "/v1/api/pacientes/**")
-                    .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR")
+                    .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
                 .requestMatchers(HttpMethod.PATCH, "/v1/api/pacientes/**")
-                    .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR")
+                    .hasAnyRole("FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
                 // Agendamentos: todos autenticados; segregacao feita no Service
                 .requestMatchers("/v1/api/agendamentos/**").authenticated()
                 // Agenda e servicos
-                .requestMatchers("/v1/api/agenda-medico/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                .requestMatchers("/v1/api/agenda-medico/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
                 // Servicos medicos: leitura tambem para PACIENTE (escolher servico no agendamento);
                 // escrita continua restrita a staff
                 .requestMatchers(HttpMethod.GET, "/v1/api/servicos-medicos/**")
-                    .hasAnyRole("PACIENTE", "MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
-                .requestMatchers("/v1/api/servicos-medicos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
-                .requestMatchers("/v1/api/estabelecimentos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
-                // Funcionarios: MEDICO gerencia apenas funcionarios dos seus estabelecimentos
-                .requestMatchers("/v1/api/funcionarios/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR")
+                    .hasAnyRole("PACIENTE", "MEDICO", "FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
+                .requestMatchers("/v1/api/servicos-medicos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
+                .requestMatchers("/v1/api/estabelecimentos/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
+                // Funcionarios: MEDICO, FUNCIONARIO e ADMIN_ESTABELECIMENTO gerenciam apenas
+                // funcionarios dos seus proprios estabelecimentos (escopo no Service)
+                .requestMatchers("/v1/api/funcionarios/**").hasAnyRole("MEDICO", "FUNCIONARIO", "DESENVOLVEDOR", "ADMIN_ESTABELECIMENTO")
+                // Administradores: gerenciados só por DESENVOLVEDOR (criação do perfil
+                // e vínculo a estabelecimento não é self-service)
+                .requestMatchers("/v1/api/administradores/**").hasRole("DESENVOLVEDOR")
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

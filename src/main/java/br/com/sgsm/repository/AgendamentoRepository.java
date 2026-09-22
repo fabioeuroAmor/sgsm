@@ -37,4 +37,10 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
             @Param("inicioDia") OffsetDateTime inicioDia,
             @Param("fimDia") OffsetDateTime fimDia,
             @Param("statusExcluidos") Collection<StatusAgendamento> statusExcluidos);
+
+    // Visibilidade de paciente para FUNCIONARIO/ADMIN_ESTABELECIMENTO: por médico
+    // vinculado ao estabelecimento, não por Agendamento.estabelecimentoId (que fica
+    // nulo em agendamento domiciliar) — inclui paciente atendido só em domicílio.
+    @Query("SELECT DISTINCT a.pacienteId FROM Agendamento a WHERE a.medicoId IN :medicoIds")
+    List<UUID> findPacienteIdsDistintosByMedicoIdIn(@Param("medicoIds") Collection<UUID> medicoIds);
 }

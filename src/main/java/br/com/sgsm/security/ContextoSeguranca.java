@@ -41,6 +41,10 @@ public class ContextoSeguranca {
         return temRole("ROLE_PACIENTE");
     }
 
+    public boolean isAdminEstabelecimento() {
+        return temRole("ROLE_ADMIN_ESTABELECIMENTO");
+    }
+
     private boolean temRole(String role) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) return false;

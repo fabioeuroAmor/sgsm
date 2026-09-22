@@ -7,6 +7,7 @@ import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.*;
 import br.com.sgsm.security.ContextoSeguranca;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ public class AgendamentoService {
     private final ModelMapper modelMapper;
     private final ContextoSeguranca contextoSeguranca;
     private final VetorizacaoPublisher vetorizacaoPublisher;
+    private final EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     public AgendamentoService(
             AgendamentoRepository agendamentoRepository,
@@ -49,7 +51,8 @@ public class AgendamentoService {
             PacienteRepository pacienteRepository,
             ModelMapper modelMapper,
             ContextoSeguranca contextoSeguranca,
-            VetorizacaoPublisher vetorizacaoPublisher) {
+            VetorizacaoPublisher vetorizacaoPublisher,
+            EstabelecimentoAcessoService estabelecimentoAcessoService) {
         this.agendamentoRepository = agendamentoRepository;
         this.agendaMedicoRepository = agendaMedicoRepository;
         this.bloqueioAgendaRepository = bloqueioAgendaRepository;
@@ -61,6 +64,7 @@ public class AgendamentoService {
         this.modelMapper = modelMapper;
         this.contextoSeguranca = contextoSeguranca;
         this.vetorizacaoPublisher = vetorizacaoPublisher;
+        this.estabelecimentoAcessoService = estabelecimentoAcessoService;
     }
 
     @Transactional(readOnly = true)
@@ -249,6 +253,18 @@ public class AgendamentoService {
         if (data != null) {
             resultado = resultado.stream()
                     .filter(a -> a.getDataHoraInicio().atZoneSameInstant(ZONA).toLocalDate().equals(data))
+                    .toList();
+        }
+
+        // FUNCIONARIO/ADMIN_ESTABELECIMENTO: restringe ao(s) estabelecimento(s) vinculado(s).
+        // Agendamento domiciliar tem estabelecimentoId nulo e fica de fora aqui - staff
+        // administrativo enxerga o agendamento presencial da propria clinica, nao a visita
+        // em domicilio (esse caso e tratado a parte na visibilidade de paciente, Parte G).
+        List<UUID> estabelecimentosPermitidos = estabelecimentoAcessoService.estabelecimentosPermitidos();
+        if (estabelecimentosPermitidos != null) {
+            resultado = resultado.stream()
+                    .filter(a -> a.getEstabelecimentoId() != null
+                            && estabelecimentosPermitidos.contains(a.getEstabelecimentoId()))
                     .toList();
         }
 

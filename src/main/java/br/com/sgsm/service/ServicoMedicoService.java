@@ -9,6 +9,7 @@ import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.ServicoMedicoRepository;
 import br.com.sgsm.security.ContextoSeguranca;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +25,16 @@ public class ServicoMedicoService {
     private final ModelMapper modelMapper;
     private final VetorizacaoPublisher vetorizacaoPublisher;
     private final ContextoSeguranca contextoSeguranca;
+    private final EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     public ServicoMedicoService(ServicoMedicoRepository repository, ModelMapper modelMapper,
-                                VetorizacaoPublisher vetorizacaoPublisher, ContextoSeguranca contextoSeguranca) {
+                                VetorizacaoPublisher vetorizacaoPublisher, ContextoSeguranca contextoSeguranca,
+                                EstabelecimentoAcessoService estabelecimentoAcessoService) {
         this.repository = repository;
         this.modelMapper = modelMapper;
         this.vetorizacaoPublisher = vetorizacaoPublisher;
         this.contextoSeguranca = contextoSeguranca;
+        this.estabelecimentoAcessoService = estabelecimentoAcessoService;
     }
 
     public ServicoMedicoResponse cadastrar(CadastrarServicoMedicoRequest request) {
@@ -77,6 +81,9 @@ public class ServicoMedicoService {
         UUID ref = contextoSeguranca.getReferenciaId();
         if (contextoSeguranca.isMedico() && !medicoId.equals(ref)) {
             throw new AcessoNegadoException("Médico não pode gerenciar serviço de outro médico: " + medicoId);
+        }
+        if (!contextoSeguranca.isMedico() && !estabelecimentoAcessoService.medicoPermitido(medicoId)) {
+            throw new AcessoNegadoException("Médico não vinculado a estabelecimento permitido: " + medicoId);
         }
     }
 

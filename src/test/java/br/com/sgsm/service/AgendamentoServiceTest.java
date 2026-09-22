@@ -9,6 +9,7 @@ import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.repository.*;
 import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.security.ContextoSeguranca;
+import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +58,8 @@ class AgendamentoServiceTest {
     private ContextoSeguranca contextoSeguranca;
     @Mock
     private VetorizacaoPublisher vetorizacaoPublisher;
+    @Mock
+    private EstabelecimentoAcessoService estabelecimentoAcessoService;
 
     private AgendamentoService service;
 
@@ -66,7 +69,11 @@ class AgendamentoServiceTest {
                 agendamentoRepository, agendaMedicoRepository, bloqueioAgendaRepository,
                 medicoEstabelecimentoRepository, servicoMedicoRepository, medicoRepository,
                 estabelecimentoRepository, pacienteRepository,
-                new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher);
+                new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher,
+                estabelecimentoAcessoService);
+        // Mockito retorna List vazia (nao null) para metodo List<> nao-stubado - sem isso,
+        // o service entenderia "escopado a zero estabelecimentos" em vez de "irrestrito".
+        lenient().when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(null);
     }
 
     // ---------- Fixtures ----------
@@ -706,6 +713,26 @@ class AgendamentoServiceTest {
 
         var resultado = service.listar(null, null, medicoId,
                 hoje.getDataHoraInicio().atZoneSameInstant(ZoneId.of("America/Sao_Paulo")).toLocalDate());
+
+        assertThat(resultado).hasSize(1);
+    }
+
+    @Test
+    void deveFiltrarPorEstabelecimentoPermitidoQuandoEscopado() {
+        UUID estabPermitido = UUID.randomUUID();
+        UUID estabNaoPermitido = UUID.randomUUID();
+        var doEstabPermitido = novoAgendamento(UUID.randomUUID(), UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.PRESENCIAL);
+        doEstabPermitido.setEstabelecimentoId(estabPermitido);
+        var doOutroEstab = novoAgendamento(UUID.randomUUID(), UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.PRESENCIAL);
+        doOutroEstab.setEstabelecimentoId(estabNaoPermitido);
+        var domiciliar = novoAgendamento(UUID.randomUUID(), UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.DOMICILIAR);
+        // estabelecimentoId nulo (domiciliar) - fica de fora do escopo por estabelecimento
+        when(contextoSeguranca.isMedico()).thenReturn(false);
+        when(contextoSeguranca.isPaciente()).thenReturn(false);
+        when(agendamentoRepository.findAll()).thenReturn(List.of(doEstabPermitido, doOutroEstab, domiciliar));
+        when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(List.of(estabPermitido));
+
+        var resultado = service.listar(null, null, null, null);
 
         assertThat(resultado).hasSize(1);
     }

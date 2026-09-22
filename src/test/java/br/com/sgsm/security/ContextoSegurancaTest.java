@@ -135,4 +135,18 @@ class ContextoSegurancaTest {
 
         assertThat(contexto.isMedico()).isFalse();
     }
+
+    @Test
+    void isAdminEstabelecimentoDeveRetornarTrueQuandoRolePresente() {
+        configurarAutenticacao("ROLE_ADMIN_ESTABELECIMENTO");
+
+        assertThat(contexto.isAdminEstabelecimento()).isTrue();
+    }
+
+    @Test
+    void isAdminEstabelecimentoDeveRetornarFalseQuandoRoleAusente() {
+        configurarAutenticacao("ROLE_MEDICO");
+
+        assertThat(contexto.isAdminEstabelecimento()).isFalse();
+    }
 }
