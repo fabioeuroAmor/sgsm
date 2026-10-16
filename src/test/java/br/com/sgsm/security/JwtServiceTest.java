@@ -25,8 +25,19 @@ class JwtServiceTest {
     private final JwtService jwtService = new JwtService(SECRET);
 
     private String gerarToken(SecretKey chave, Date expiracao) {
-        return Jwts.builder()
-                .subject(UUID.randomUUID().toString())
+        return gerarToken(chave, expiracao, "sgsm-auth", "sgsm");
+    }
+
+    private String gerarToken(SecretKey chave, Date expiracao, String emissor, String audiencia) {
+        var builder = Jwts.builder()
+                .subject(UUID.randomUUID().toString());
+        if (emissor != null) {
+            builder.issuer(emissor);
+        }
+        if (audiencia != null) {
+            builder.audience().add(audiencia);
+        }
+        return builder
                 .claim("perfil", "MEDICO")
                 .claim("referenciaId", UUID.randomUUID().toString())
                 .claim("email", "medico@sgsm.com.br")
@@ -69,6 +80,31 @@ class JwtServiceTest {
         SecretKey outraChave = Keys.hmacShaKeyFor(
                 "outra-chave-completamente-diferente-com-256-bits-no-minimo".getBytes(StandardCharsets.UTF_8));
         String token = gerarToken(outraChave, Date.from(Instant.now().plus(1, ChronoUnit.HOURS)));
+
+        assertThat(jwtService.tokenValido(token)).isFalse();
+    }
+
+    // Mesmo segredo, mas sem iss/aud: emitido antes desta versão ou por outro sistema
+    @Test
+    void tokenValidoDeveRetornarFalseSemIssuerEAudiencia() {
+        SecretKey chave = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String token = gerarToken(chave, Date.from(Instant.now().plus(1, ChronoUnit.HOURS)), null, null);
+
+        assertThat(jwtService.tokenValido(token)).isFalse();
+    }
+
+    @Test
+    void tokenValidoDeveRetornarFalseParaOutroEmissor() {
+        SecretKey chave = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String token = gerarToken(chave, Date.from(Instant.now().plus(1, ChronoUnit.HOURS)), "outro-sistema", "sgsm");
+
+        assertThat(jwtService.tokenValido(token)).isFalse();
+    }
+
+    @Test
+    void tokenValidoDeveRetornarFalseSemSgsmNaAudiencia() {
+        SecretKey chave = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String token = gerarToken(chave, Date.from(Instant.now().plus(1, ChronoUnit.HOURS)), "sgsm-auth", "sgsm-ia");
 
         assertThat(jwtService.tokenValido(token)).isFalse();
     }
