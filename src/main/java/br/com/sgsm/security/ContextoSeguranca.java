@@ -20,6 +20,12 @@ public class ContextoSeguranca {
         return atributoRequest("email");
     }
 
+    // Id do usuário em auth.usuario (subject do JWT) — dono das pré-reservas de horário
+    public String getUsuarioId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null ? auth.getName() : null;
+    }
+
     public UUID getReferenciaId() {
         String val = atributoRequest("referenciaId");
         return val != null ? UUID.fromString(val) : null;

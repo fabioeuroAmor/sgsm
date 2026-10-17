@@ -4,16 +4,25 @@ import br.com.sgsm.domain.*;
 import br.com.sgsm.dto.*;
 import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.exception.AcessoNegadoException;
+import br.com.sgsm.exception.GlobalExceptionHandler;
+import br.com.sgsm.exception.HorarioIndisponivelException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.repository.*;
 import br.com.sgsm.security.ContextoSeguranca;
 import br.com.sgsm.security.EstabelecimentoAcessoService;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.*;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,6 +31,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Transactional
 public class AgendamentoService {
 
+    private static final Logger log = LoggerFactory.getLogger(AgendamentoService.class);
+    private static final int MAX_ALTERNATIVAS = 3;
+    private static final int DIAS_BUSCA_ALTERNATIVAS = 7;
     private static final ZoneId ZONA = ZoneId.of("America/Sao_Paulo");
     private static final List<StatusAgendamento> STATUS_IGNORADOS =
             List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
@@ -39,6 +51,7 @@ public class AgendamentoService {
     private final ContextoSeguranca contextoSeguranca;
     private final VetorizacaoPublisher vetorizacaoPublisher;
     private final EstabelecimentoAcessoService estabelecimentoAcessoService;
+    private final ReservaHorarioService reservaHorarioService;
 
     public AgendamentoService(
             AgendamentoRepository agendamentoRepository,
@@ -52,7 +65,8 @@ public class AgendamentoService {
             ModelMapper modelMapper,
             ContextoSeguranca contextoSeguranca,
             VetorizacaoPublisher vetorizacaoPublisher,
-            EstabelecimentoAcessoService estabelecimentoAcessoService) {
+            EstabelecimentoAcessoService estabelecimentoAcessoService,
+            ReservaHorarioService reservaHorarioService) {
         this.agendamentoRepository = agendamentoRepository;
         this.agendaMedicoRepository = agendaMedicoRepository;
         this.bloqueioAgendaRepository = bloqueioAgendaRepository;
@@ -65,6 +79,7 @@ public class AgendamentoService {
         this.contextoSeguranca = contextoSeguranca;
         this.vetorizacaoPublisher = vetorizacaoPublisher;
         this.estabelecimentoAcessoService = estabelecimentoAcessoService;
+        this.reservaHorarioService = reservaHorarioService;
     }
 
     @Transactional(readOnly = true)
@@ -86,10 +101,20 @@ public class AgendamentoService {
                 .toList();
     }
 
+    // Grade de horários livres: FUNCIONARIO/ADMIN_ESTABELECIMENTO só enxergam agendas das suas
+    // clínicas e MEDICO só a própria (mesma regra do agendamento — 404 fora do escopo)
     @Transactional(readOnly = true)
     public List<SlotDisponivelResponse> listarSlotsDisponiveis(
             UUID medicoId, UUID estabelecimentoId, LocalDate data) {
+        validarEscopoAgenda(medicoId, estabelecimentoId, tipoDaGrade(estabelecimentoId));
+        return calcularSlots(medicoId, estabelecimentoId, data);
+    }
 
+    private static TipoAgendamento tipoDaGrade(UUID estabelecimentoId) {
+        return estabelecimentoId != null ? TipoAgendamento.PRESENCIAL : TipoAgendamento.DOMICILIAR;
+    }
+
+    private List<SlotDisponivelResponse> calcularSlots(UUID medicoId, UUID estabelecimentoId, LocalDate data) {
         DiaSemana diaSemana = DiaSemana.from(data.getDayOfWeek());
 
         var agendas = (estabelecimentoId != null
@@ -114,6 +139,8 @@ public class AgendamentoService {
 
         var ocupados = agendamentoRepository.findOcupadosByMedicoAndData(
                 medicoId, inicioDia, fimDia, STATUS_IGNORADOS);
+        var reservas = reservasDoMedico(medicoId, inicioDia, fimDia);
+        String dono = contextoSeguranca.getUsuarioId();
 
         List<SlotDisponivelResponse> slots = new ArrayList<>();
         OffsetDateTime agora = OffsetDateTime.now(ZONA);
@@ -133,7 +160,21 @@ public class AgendamentoService {
                 if (!slotInicio.isBefore(agora)
                         && !temBloqueio(slotInicio, slotFim, bloqueios)
                         && !estaOcupado(slotInicio, slotFim, ocupados)) {
-                    slots.add(new SlotDisponivelResponse(slotInicio, slotFim, duracao));
+                    // Pré-reservado por outro usuário: some da lista; pelo próprio: aparece marcado
+                    boolean deOutro = false;
+                    boolean meu = false;
+                    for (var r : reservas) {
+                        if (r.inicio().isBefore(slotFim) && r.fim().isAfter(slotInicio)) {
+                            if (r.dono().equals(dono)) {
+                                meu = true;
+                            } else {
+                                deOutro = true;
+                            }
+                        }
+                    }
+                    if (!deOutro) {
+                        slots.add(new SlotDisponivelResponse(slotInicio, slotFim, duracao, meu));
+                    }
                 }
 
                 cursor = cursor.plusMinutes(passo);
@@ -145,10 +186,11 @@ public class AgendamentoService {
 
     @Transactional(readOnly = true)
     public List<LocalDate> listarDiasComDisponibilidade(UUID medicoId, UUID estabelecimentoId, YearMonth mes) {
+        validarEscopoAgenda(medicoId, estabelecimentoId, tipoDaGrade(estabelecimentoId));
         List<LocalDate> dias = new ArrayList<>();
         LocalDate fim = mes.atEndOfMonth();
         for (LocalDate data = mes.atDay(1); !data.isAfter(fim); data = data.plusDays(1)) {
-            if (!listarSlotsDisponiveis(medicoId, estabelecimentoId, data).isEmpty()) {
+            if (!calcularSlots(medicoId, estabelecimentoId, data).isEmpty()) {
                 dias.add(data);
             }
         }
@@ -187,7 +229,13 @@ public class AgendamentoService {
         OffsetDateTime dataHoraInicio = request.dataHoraInicio();
         OffsetDateTime dataHoraFim = dataHoraInicio.plusMinutes(duracao);
         UUID medicoId = servico.getMedicoId();
+        validarEscopoAgenda(medicoId, request.estabelecimentoId(), tipo);
+        String dono = contextoSeguranca.getUsuarioId();
+        var reservaPropria = request.reservaToken() == null || request.reservaToken().isBlank() ? null
+                : reservaHorarioService.validarParaConsumo(request.reservaToken(), dono, medicoId, dataHoraInicio);
 
+        // A trava em memória é só otimização (vale numa instância e é liberada antes do commit);
+        // a garantia é a constraint excl_sem_conflito_medico (V013)
         synchronized (locksPorMedico.computeIfAbsent(medicoId, id -> new Object())) {
             OffsetDateTime inicioDia = dataHoraInicio.atZoneSameInstant(ZONA).toLocalDate()
                     .atStartOfDay(ZONA).toOffsetDateTime();
@@ -195,8 +243,14 @@ public class AgendamentoService {
             var ocupados = agendamentoRepository.findOcupadosByMedicoAndData(
                     medicoId, inicioDia, fimDia, STATUS_IGNORADOS);
             if (estaOcupado(dataHoraInicio, dataHoraFim, ocupados)) {
-                throw new IllegalArgumentException(
-                        "Horário indisponível: já existe agendamento para este médico neste período.");
+                throw new HorarioIndisponivelException(
+                        "Horário indisponível: já existe agendamento para este médico neste período.",
+                        alternativas(medicoId, request.estabelecimentoId(), tipo, dataHoraInicio));
+            }
+            if (existeReservaDeOutro(medicoId, dataHoraInicio, dataHoraFim, dono)) {
+                throw new HorarioIndisponivelException(
+                        "Horário em pré-reserva por outro usuário. Escolha outro horário.",
+                        alternativas(medicoId, request.estabelecimentoId(), tipo, dataHoraInicio));
             }
 
             var agendamento = new Agendamento();
@@ -209,7 +263,21 @@ public class AgendamentoService {
             agendamento.setDataHoraFim(dataHoraFim);
             agendamento.setObservacoes(request.observacoes());
 
-            var salvo = agendamentoRepository.saveAndFlush(agendamento);
+            Agendamento salvo;
+            try {
+                salvo = agendamentoRepository.saveAndFlush(agendamento);
+            } catch (DataIntegrityViolationException e) {
+                // Corrida entre réplicas/canais: a constraint barrou o segundo. A transação já está
+                // perdida, então não dá para consultar alternativas aqui
+                if (GlobalExceptionHandler.violacaoDeExclusao(e)) {
+                    throw new HorarioIndisponivelException(
+                            "Horário indisponível: já existe agendamento para este médico neste período.", List.of());
+                }
+                throw e;
+            }
+            if (reservaPropria != null) {
+                removerReservaAposCommit(reservaPropria);
+            }
             vetorizacaoPublisher.publicar("AGENDAMENTO", salvo.getId().toString(), "CREATE");
             return toResponse(salvo);
         }
@@ -323,6 +391,149 @@ public class AgendamentoService {
         if (contextoSeguranca.isPaciente() && !agendamento.getPacienteId().equals(ref)) {
             throw new AcessoNegadoException("Acesso negado ao agendamento: " + agendamento.getId());
         }
+        // Secretária (FUNCIONARIO) e ADMIN_ESTABELECIMENTO: só agendamentos das suas clínicas —
+        // presencial pelo estabelecimento, domiciliar pelo médico vinculado. Fora disso = 404
+        if (contextoSeguranca.isFuncionario() || contextoSeguranca.isAdminEstabelecimento()) {
+            if (!agendaNoEscopoDaClinica(agendamento.getMedicoId(), agendamento.getEstabelecimentoId(),
+                    agendamento.getTipo())) {
+                throw new RecursoNaoEncontradoException("Agendamento não encontrado: " + agendamento.getId());
+            }
+        }
+    }
+
+    // Quem pode agendar/reservar em qual agenda (DA2 do plano de conflito de agendamento):
+    // FUNCIONARIO e ADMIN_ESTABELECIMENTO só médicos das suas clínicas; MEDICO só a própria agenda;
+    // PACIENTE para si mesmo em qualquer médico ofertado (validado à parte); DESENVOLVEDOR qualquer
+    private void validarEscopoAgenda(UUID medicoId, UUID estabelecimentoId, TipoAgendamento tipo) {
+        if (contextoSeguranca.isMedico() && !medicoId.equals(contextoSeguranca.getReferenciaId())) {
+            throw new RecursoNaoEncontradoException("Agenda não encontrada para o médico: " + medicoId);
+        }
+        if ((contextoSeguranca.isFuncionario() || contextoSeguranca.isAdminEstabelecimento())
+                && !agendaNoEscopoDaClinica(medicoId, estabelecimentoId, tipo)) {
+            throw new RecursoNaoEncontradoException("Agenda não encontrada para o médico: " + medicoId);
+        }
+    }
+
+    private boolean agendaNoEscopoDaClinica(UUID medicoId, UUID estabelecimentoId, TipoAgendamento tipo) {
+        if (tipo != TipoAgendamento.DOMICILIAR && estabelecimentoId != null) {
+            List<UUID> permitidos = estabelecimentoAcessoService.estabelecimentosPermitidos();
+            return permitidos == null || permitidos.contains(estabelecimentoId);
+        }
+        return estabelecimentoAcessoService.medicoPermitido(medicoId);
+    }
+
+    // ── pré-reserva de horário (Fase 3) ───────────────────────────────────────
+
+    public ReservaResponse reservar(CriarReservaRequest request) {
+        var servico = servicoMedicoRepository.findById(request.servicoMedicoId())
+                .orElseThrow(() -> new RecursoNaoEncontradoException(
+                        "ServicoMedico não encontrado: " + request.servicoMedicoId()));
+        if (!Boolean.TRUE.equals(servico.getAtivo())) {
+            throw new IllegalArgumentException("Serviço médico inativo: " + request.servicoMedicoId());
+        }
+        if (request.dataHoraInicio() == null || request.dataHoraInicio().isBefore(OffsetDateTime.now(ZONA))) {
+            throw new IllegalArgumentException("Horário inválido para pré-reserva.");
+        }
+        TipoAgendamento tipo = request.tipo() != null ? request.tipo() : TipoAgendamento.PRESENCIAL;
+        UUID estabelecimentoId = tipo == TipoAgendamento.DOMICILIAR ? null : request.estabelecimentoId();
+        UUID medicoId = servico.getMedicoId();
+        validarEscopoAgenda(medicoId, estabelecimentoId, tipo);
+
+        int duracao = servico.getDuracaoMinutos() != null ? servico.getDuracaoMinutos() : 30;
+        OffsetDateTime inicio = request.dataHoraInicio();
+        OffsetDateTime fim = inicio.plusMinutes(duracao);
+        OffsetDateTime inicioDia = inicio.atZoneSameInstant(ZONA).toLocalDate().atStartOfDay(ZONA).toOffsetDateTime();
+        var ocupados = agendamentoRepository.findOcupadosByMedicoAndData(
+                medicoId, inicioDia, inicioDia.plusDays(1), STATUS_IGNORADOS);
+        if (estaOcupado(inicio, fim, ocupados)) {
+            throw new HorarioIndisponivelException(
+                    "Horário indisponível: já existe agendamento para este médico neste período.",
+                    alternativas(medicoId, estabelecimentoId, tipo, inicio));
+        }
+        try {
+            var reserva = reservaHorarioService.criar(medicoId, request.servicoMedicoId(), estabelecimentoId, tipo.name(),
+                    inicio, fim, contextoSeguranca.getUsuarioId());
+            return new ReservaResponse(reserva.token(), inicio, fim, reservaHorarioService.noFuso(reserva.expiraEm()),
+                    reservaHorarioService.noFuso(reserva.renovavelAte()), true);
+        } catch (HorarioIndisponivelException e) {
+            throw new HorarioIndisponivelException(e.getMessage(), alternativas(medicoId, estabelecimentoId, tipo, inicio));
+        } catch (DataAccessException e) {
+            // Redis fora do ar: falha aberta — o fluxo segue sem pré-reserva e a constraint do
+            // banco continua impedindo dois agendamentos no mesmo horário
+            log.warn("Pré-reserva indisponível (Redis): {}", e.getMessage());
+            return new ReservaResponse(null, inicio, fim, null, null, false);
+        }
+    }
+
+    public ReservaResponse renovarReserva(String token) {
+        var reserva = reservaHorarioService.renovar(token, contextoSeguranca.getUsuarioId());
+        return new ReservaResponse(reserva.token(), reserva.inicio(), reserva.fim(),
+                reservaHorarioService.noFuso(reserva.expiraEm()), reservaHorarioService.noFuso(reserva.renovavelAte()), true);
+    }
+
+    public void liberarReserva(String token) {
+        reservaHorarioService.liberar(token, contextoSeguranca.getUsuarioId());
+    }
+
+    private List<ReservaHorarioService.Reserva> reservasDoMedico(UUID medicoId, OffsetDateTime de, OffsetDateTime ate) {
+        try {
+            return reservaHorarioService.ativasDoMedico(medicoId, de, ate);
+        } catch (DataAccessException e) {
+            log.warn("Pré-reservas indisponíveis (Redis) — horários listados sem considerá-las: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private boolean existeReservaDeOutro(UUID medicoId, OffsetDateTime inicio, OffsetDateTime fim, String dono) {
+        return reservasDoMedico(medicoId, inicio, fim).stream().anyMatch(r -> !r.dono().equals(dono));
+    }
+
+    // A reserva só some depois do commit: se a gravação falhar, o horário continua segurado
+    private void removerReservaAposCommit(ReservaHorarioService.Reserva reserva) {
+        Runnable remover = () -> {
+            try {
+                reservaHorarioService.remover(reserva);
+            } catch (DataAccessException e) {
+                log.warn("Não foi possível remover a pré-reserva consumida {}: {}", reserva.token(), e.getMessage());
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    remover.run();
+                }
+            });
+        } else {
+            remover.run();
+        }
+    }
+
+    // Horários livres mais próximos do pedido, do mesmo médico, nos próximos dias
+    List<SlotDisponivelResponse> alternativas(UUID medicoId, UUID estabelecimentoId, TipoAgendamento tipo,
+                                              OffsetDateTime pedido) {
+        List<UUID> estabelecimentos = new ArrayList<>();
+        if (tipo == TipoAgendamento.DOMICILIAR) {
+            estabelecimentos.add(null);
+        } else if (estabelecimentoId != null) {
+            estabelecimentos.add(estabelecimentoId);
+        } else {
+            // Presencial sem estabelecimento (ex.: bot de WhatsApp): qualquer clínica do médico
+            medicoEstabelecimentoRepository.findById_MedicoIdAndAtivo(medicoId, true)
+                    .forEach(v -> estabelecimentos.add(v.getId().getEstabelecimentoId()));
+        }
+        LocalDate dia = pedido.atZoneSameInstant(ZONA).toLocalDate();
+        List<SlotDisponivelResponse> encontrados = new ArrayList<>();
+        for (int i = 0; i < DIAS_BUSCA_ALTERNATIVAS && encontrados.size() < MAX_ALTERNATIVAS; i++) {
+            for (UUID estabelecimento : estabelecimentos) {
+                encontrados.addAll(calcularSlots(medicoId, estabelecimento, dia.plusDays(i)));
+            }
+        }
+        return encontrados.stream()
+                .filter(s -> !s.dataHoraInicio().isEqual(pedido))
+                .sorted(Comparator.comparingLong(s -> Math.abs(Duration.between(pedido, s.dataHoraInicio()).toMinutes())))
+                .limit(MAX_ALTERNATIVAS)
+                .toList();
     }
 
     private AgendamentoResponse toResponse(Agendamento a) {

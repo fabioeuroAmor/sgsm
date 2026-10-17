@@ -48,6 +48,24 @@ public class AgendamentoController {
         return ResponseEntity.ok(service.listarDiasComDisponibilidade(medicoId, estabelecimentoId, mes));
     }
 
+    // Pré-reserva temporária do horário enquanto a secretária/paciente finaliza (10 min, renovável
+    // até 30). 409 com alternativas se o horário já estiver ocupado ou pré-reservado por outro
+    @PostMapping("/reservas")
+    public ResponseEntity<ReservaResponse> reservar(@RequestBody CriarReservaRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.reservar(request));
+    }
+
+    @PostMapping("/reservas/{token}/renovar")
+    public ResponseEntity<ReservaResponse> renovarReserva(@PathVariable String token) {
+        return ResponseEntity.ok(service.renovarReserva(token));
+    }
+
+    @DeleteMapping("/reservas/{token}")
+    public ResponseEntity<Void> liberarReserva(@PathVariable String token) {
+        service.liberarReserva(token);
+        return ResponseEntity.noContent().build();
+    }
+
     // UC - Cadastrar agendamento
     @PostMapping
     public ResponseEntity<AgendamentoResponse> cadastrar(@RequestBody CadastrarAgendamentoRequest request) {

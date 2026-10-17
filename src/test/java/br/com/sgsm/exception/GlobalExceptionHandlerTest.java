@@ -33,6 +33,33 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void horarioIndisponivelDeveSer409ComAlternativas() {
+        when(request.getRequestURI()).thenReturn("/v1/api/agendamentos");
+        var alternativa = new br.com.sgsm.dto.SlotDisponivelResponse(java.time.OffsetDateTime.now(),
+                java.time.OffsetDateTime.now().plusMinutes(30), 30);
+        var ex = new HorarioIndisponivelException("Horário indisponível", java.util.List.of(alternativa));
+
+        ResponseEntity<ProblemDetail> response = handler.handleHorarioIndisponivel(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().getProperties()).containsEntry("alternativas", java.util.List.of(alternativa));
+    }
+
+    // Violação da constraint excl_sem_conflito_medico (V013) = conflito de horário, não dado duplicado
+    @Test
+    void violacaoDeExclusaoDeveSer409() {
+        when(request.getRequestURI()).thenReturn("/v1/api/agendamentos");
+        var ex = new DataIntegrityViolationException("excl",
+                new RuntimeException(new java.sql.SQLException("exclusion", "23P01")));
+
+        ResponseEntity<ProblemDetail> response = handler.handleIntegridadeDados(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().getTitle()).isEqualTo("Horário indisponível");
+        assertThat(GlobalExceptionHandler.violacaoDeExclusao(new RuntimeException("sem causa sql"))).isFalse();
+    }
+
+    @Test
     void deveRetornar404QuandoRecursoNaoEncontrado() {
         when(request.getRequestURI()).thenReturn("/v1/api/medicos/123");
         var ex = new RecursoNaoEncontradoException("Médico não encontrado: 123");

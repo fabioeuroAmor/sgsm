@@ -52,6 +52,15 @@ class ContextoSegurancaTest {
     }
 
     @Test
+    void usuarioIdEhOSubjectDoJwt() {
+        assertThat(contexto.getUsuarioId()).isNull();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("usuario-123", null, java.util.List.of()));
+
+        assertThat(contexto.getUsuarioId()).isEqualTo("usuario-123");
+    }
+
+    @Test
     void deveRetornarPerfilDoAtributoDeRequisicao() {
         configurarRequestAttributes("MEDICO", null);
 

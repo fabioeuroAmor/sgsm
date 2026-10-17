@@ -60,6 +60,8 @@ class AgendamentoServiceTest {
     private VetorizacaoPublisher vetorizacaoPublisher;
     @Mock
     private EstabelecimentoAcessoService estabelecimentoAcessoService;
+    @Mock
+    private ReservaHorarioService reservaHorarioService;
 
     private AgendamentoService service;
 
@@ -70,7 +72,7 @@ class AgendamentoServiceTest {
                 medicoEstabelecimentoRepository, servicoMedicoRepository, medicoRepository,
                 estabelecimentoRepository, pacienteRepository,
                 new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher,
-                estabelecimentoAcessoService);
+                estabelecimentoAcessoService, reservaHorarioService);
         // Mockito retorna List vazia (nao null) para metodo List<> nao-stubado - sem isso,
         // o service entenderia "escopado a zero estabelecimentos" em vez de "irrestrito".
         lenient().when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(null);

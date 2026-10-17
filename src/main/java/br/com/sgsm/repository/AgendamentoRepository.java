@@ -27,10 +27,12 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
 
     List<Agendamento> findAllByMedicoIdAndPacienteIdAndStatus(UUID medicoId, UUID pacienteId, StatusAgendamento status);
 
+    // Sobreposição com o período (não só "começa no dia"): pega também o atendimento que começa
+    // antes e termina dentro dele, como um que atravessa a meia-noite
     @Query("SELECT a FROM Agendamento a " +
            "WHERE a.medicoId = :medicoId " +
-           "AND a.dataHoraInicio >= :inicioDia " +
            "AND a.dataHoraInicio < :fimDia " +
+           "AND a.dataHoraFim > :inicioDia " +
            "AND a.status NOT IN :statusExcluidos")
     List<Agendamento> findOcupadosByMedicoAndData(
             @Param("medicoId") UUID medicoId,

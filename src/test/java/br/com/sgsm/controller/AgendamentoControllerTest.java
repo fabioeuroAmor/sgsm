@@ -36,6 +36,20 @@ class AgendamentoControllerTest {
     }
 
     @Test
+    void endpointsDePreReservaDelegamAoService() {
+        var pedido = new CriarReservaRequest(UUID.randomUUID(), UUID.randomUUID(), null, OffsetDateTime.now());
+        var reserva = new ReservaResponse("tok", OffsetDateTime.now(), OffsetDateTime.now(), OffsetDateTime.now(),
+                OffsetDateTime.now(), true);
+        when(service.reservar(pedido)).thenReturn(reserva);
+        when(service.renovarReserva("tok")).thenReturn(reserva);
+
+        assertThat(controller.reservar(pedido).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(controller.renovarReserva("tok").getBody()).isEqualTo(reserva);
+        assertThat(controller.liberarReserva("tok").getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verify(service).liberarReserva("tok");
+    }
+
+    @Test
     void deveRetornar200ComListaDeEstabelecimentosPorMedico() {
         UUID medicoId = UUID.randomUUID();
         var resposta = new EstabelecimentoResponse();
