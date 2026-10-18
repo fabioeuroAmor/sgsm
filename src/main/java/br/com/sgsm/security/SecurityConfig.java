@@ -3,11 +3,13 @@ package br.com.sgsm.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
@@ -25,6 +27,9 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // Sem token = 401 (não 403): o front só tenta refresh/redireciona para o login em 401.
+            // 403 fica para quem está autenticado mas não tem o papel exigido.
+            .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> auth
                 // Swagger
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
@@ -32,6 +37,8 @@ public class SecurityConfig {
                 // forward interno pra cá, que reentra na cadeia de segurança sem token válido —
                 // sem isso, o forward era barrado com 403 e sobrescrevia o 401 original.
                 .requestMatchers("/error").permitAll()
+                // Auto-cadastro público de paciente (limite por IP e ativação por e-mail no service)
+                .requestMatchers(HttpMethod.POST, "/v1/api/publico/pacientes").permitAll()
                 // Medicos: MEDICO so ve a si mesmo; FUNCIONARIO, ADMIN_ESTABELECIMENTO e
                 // DESENVOLVEDOR veem todos (escopados por estabelecimento no Service,
                 // exceto DESENVOLVEDOR); PACIENTE precisa listar para escolher medico/

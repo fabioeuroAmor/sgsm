@@ -1,6 +1,8 @@
 package br.com.sgsm.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -14,6 +16,8 @@ import java.sql.SQLException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(RecursoNaoEncontradoException.class)
     public ResponseEntity<ProblemDetail> handleNaoEncontrado(RecursoNaoEncontradoException ex, HttpServletRequest request) {
@@ -31,6 +35,21 @@ public class GlobalExceptionHandler {
         var resposta = problem(HttpStatus.CONFLICT, "horario-indisponivel", "Horário indisponível", ex.getMessage(), request);
         resposta.getBody().setProperty("alternativas", ex.getAlternativas());
         return resposta;
+    }
+
+    @ExceptionHandler(CadastroIndisponivelException.class)
+    public ResponseEntity<ProblemDetail> handleCadastroIndisponivel(CadastroIndisponivelException ex, HttpServletRequest request) {
+        return problem(HttpStatus.CONFLICT, "cadastro-indisponivel", "Cadastro não concluído", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(MuitasTentativasException.class)
+    public ResponseEntity<ProblemDetail> handleMuitasTentativas(MuitasTentativasException ex, HttpServletRequest request) {
+        return problem(HttpStatus.TOO_MANY_REQUESTS, "muitas-tentativas", "Muitas tentativas", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(ServicoIndisponivelException.class)
+    public ResponseEntity<ProblemDetail> handleServicoIndisponivel(ServicoIndisponivelException ex, HttpServletRequest request) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "servico-indisponivel", "Serviço indisponível", ex.getMessage(), request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -55,6 +74,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleErroInterno(Exception ex, HttpServletRequest request) {
+        // o cliente recebe a mensagem genérica; a causa precisa ficar no log (antes o 500 sumia sem rastro)
+        log.error("Erro interno em {} {}", request.getMethod(), request.getRequestURI(), ex);
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "erro-interno", "Erro interno",
                 "Erro interno. Tente novamente mais tarde.", request);
     }

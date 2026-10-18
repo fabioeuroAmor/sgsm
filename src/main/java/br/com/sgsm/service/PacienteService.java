@@ -237,6 +237,20 @@ public class PacienteService {
                 .toList();
     }
 
+    // Auto-cadastro público: checa duplicidade sem dizer QUAL dado já existe (evita enumeração)
+    @Transactional(readOnly = true)
+    public boolean cpfOuEmailJaCadastrado(String cpf, String email) {
+        return (cpf != null && repository.existsByCpfHash(cpfCryptoService.hash(normalizarCpf(cpf))))
+                || (email != null && repository.existsByEmail(email));
+    }
+
+    // Desfaz um paciente recém-criado pelo auto-cadastro quando o login não pôde ser criado no auth
+    // (não há agendamento nem outro vínculo ainda); o evento remove também o vetor no sgsm-ia
+    public void removerAutoCadastroIncompleto(UUID id) {
+        repository.deleteById(id);
+        vetorizacaoPublisher.publicar("PACIENTE", id.toString(), "ANONIMIZAR");
+    }
+
     private Paciente buscarOuLancarErro(UUID id) {
         return repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Paciente não encontrado: " + id));

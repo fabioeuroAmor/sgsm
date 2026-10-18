@@ -23,7 +23,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.*;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -205,7 +207,7 @@ public class AgendamentoService {
             }
         }
 
-        var servico = servicoMedicoRepository.findById(request.servicoMedicoId())
+        var servico = servicoMedicoRepository.findById(exigirServico(request.servicoMedicoId()))
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "ServicoMedico não encontrado: " + request.servicoMedicoId()));
 
@@ -324,15 +326,18 @@ public class AgendamentoService {
                     .toList();
         }
 
-        // FUNCIONARIO/ADMIN_ESTABELECIMENTO: restringe ao(s) estabelecimento(s) vinculado(s).
-        // Agendamento domiciliar tem estabelecimentoId nulo e fica de fora aqui - staff
-        // administrativo enxerga o agendamento presencial da propria clinica, nao a visita
-        // em domicilio (esse caso e tratado a parte na visibilidade de paciente, Parte G).
+        // FUNCIONARIO/ADMIN_ESTABELECIMENTO: mesma regra de quem pode agendar (DA2 do plano de
+        // conflito): presencial do(s) estabelecimento(s) vinculado(s) e domiciliar (sem
+        // estabelecimento) dos médicos dessas clínicas — senão a secretária agenda a visita e
+        // depois não consegue vê-la nem cancelá-la
         List<UUID> estabelecimentosPermitidos = estabelecimentoAcessoService.estabelecimentosPermitidos();
         if (estabelecimentosPermitidos != null) {
+            Map<UUID, Boolean> medicoNaClinica = new HashMap<>();
             resultado = resultado.stream()
                     .filter(a -> a.getEstabelecimentoId() != null
-                            && estabelecimentosPermitidos.contains(a.getEstabelecimentoId()))
+                            ? estabelecimentosPermitidos.contains(a.getEstabelecimentoId())
+                            : medicoNaClinica.computeIfAbsent(a.getMedicoId(),
+                                    estabelecimentoAcessoService::medicoPermitido))
                     .toList();
         }
 
@@ -422,10 +427,19 @@ public class AgendamentoService {
         return estabelecimentoAcessoService.medicoPermitido(medicoId);
     }
 
+    // Sem serviço não há médico nem duração: 400 claro em vez do 500 do findById(null)
+    // (o bot do WhatsApp chegou a enviar o pedido sem o serviço que a IA não extraiu)
+    private static UUID exigirServico(UUID servicoMedicoId) {
+        if (servicoMedicoId == null) {
+            throw new IllegalArgumentException("Informe o serviço médico do agendamento.");
+        }
+        return servicoMedicoId;
+    }
+
     // ── pré-reserva de horário (Fase 3) ───────────────────────────────────────
 
     public ReservaResponse reservar(CriarReservaRequest request) {
-        var servico = servicoMedicoRepository.findById(request.servicoMedicoId())
+        var servico = servicoMedicoRepository.findById(exigirServico(request.servicoMedicoId()))
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "ServicoMedico não encontrado: " + request.servicoMedicoId()));
         if (!Boolean.TRUE.equals(servico.getAtivo())) {

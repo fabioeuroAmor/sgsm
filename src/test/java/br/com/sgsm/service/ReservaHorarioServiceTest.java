@@ -130,6 +130,10 @@ class ReservaHorarioServiceTest {
         verify(zset).add(ReservaHorarioService.INDICE_MEDICO + MEDICO, r.token(), DEZ.toEpochSecond());
         verify(zset).add(ReservaHorarioService.INDICE_DONO + "secretaria", r.token(), DEZ.toEpochSecond());
         verify(redis).expire(ReservaHorarioService.INDICE_MEDICO + MEDICO, ReservaHorarioService.TTL_INDICE);
+        verify(redis).expire(ReservaHorarioService.INDICE_DONO + "secretaria", ReservaHorarioService.TTL_INDICE);
+        // índice dura só um pouco mais que a vida máxima de uma reserva (não fica órfão por 1 dia)
+        assertThat(ReservaHorarioService.TTL_INDICE).isGreaterThan(ReservaHorarioService.DURACAO_MAXIMA)
+                .isLessThanOrEqualTo(ReservaHorarioService.DURACAO_MAXIMA.plusMinutes(5));
         // trava sempre liberada no fim
         verify(redis).execute(any(), eq(List.of(ReservaHorarioService.TRAVA + MEDICO)), anyString());
     }

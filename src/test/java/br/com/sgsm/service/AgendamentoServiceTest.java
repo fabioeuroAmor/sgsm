@@ -727,16 +727,25 @@ class AgendamentoServiceTest {
         doEstabPermitido.setEstabelecimentoId(estabPermitido);
         var doOutroEstab = novoAgendamento(UUID.randomUUID(), UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.PRESENCIAL);
         doOutroEstab.setEstabelecimentoId(estabNaoPermitido);
-        var domiciliar = novoAgendamento(UUID.randomUUID(), UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.DOMICILIAR);
-        // estabelecimentoId nulo (domiciliar) - fica de fora do escopo por estabelecimento
+        // domiciliar (estabelecimentoId nulo): visível só se o médico for de uma clínica permitida
+        UUID medicoDaClinica = UUID.randomUUID();
+        UUID medicoDeFora = UUID.randomUUID();
+        var domiciliarDaClinica = novoAgendamento(medicoDaClinica, UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.DOMICILIAR);
+        var outroDomiciliarDaClinica = novoAgendamento(medicoDaClinica, UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.DOMICILIAR);
+        var domiciliarDeFora = novoAgendamento(medicoDeFora, UUID.randomUUID(), StatusAgendamento.PENDENTE, TipoAgendamento.DOMICILIAR);
         when(contextoSeguranca.isMedico()).thenReturn(false);
         when(contextoSeguranca.isPaciente()).thenReturn(false);
-        when(agendamentoRepository.findAll()).thenReturn(List.of(doEstabPermitido, doOutroEstab, domiciliar));
+        when(agendamentoRepository.findAll()).thenReturn(List.of(doEstabPermitido, doOutroEstab,
+                domiciliarDaClinica, outroDomiciliarDaClinica, domiciliarDeFora));
         when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(List.of(estabPermitido));
+        when(estabelecimentoAcessoService.medicoPermitido(medicoDaClinica)).thenReturn(true);
+        when(estabelecimentoAcessoService.medicoPermitido(medicoDeFora)).thenReturn(false);
 
         var resultado = service.listar(null, null, null, null);
 
-        assertThat(resultado).hasSize(1);
+        assertThat(resultado).hasSize(3);
+        // vínculo do médico consultado uma vez por médico, não por agendamento
+        verify(estabelecimentoAcessoService, times(1)).medicoPermitido(medicoDaClinica);
     }
 
     // ---------- atualizarStatus ----------

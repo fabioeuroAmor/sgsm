@@ -22,6 +22,11 @@ jwt:
   secret: sgsm-chave-desenvolvimento-local-minimo-256-bits-nao-usar-em-producao
 
 sgsm:
+  # Auto-cadastro público de paciente: o sgsm cria o login no ms-sboot-auth (servidor a servidor)
+  auth:
+    base-url: http://localhost:8081
+  autocadastro:
+    limite-por-ip: 5
   crypto:
     # Chaves de desenvolvimento local — NAO usar em producao. Em hom/prd vêm de variável de ambiente.
     cpf-key: ngKlS3LNRsDEW0jmZqYtWD/Rh2jQNIx0AJ/4UsNWUlg=

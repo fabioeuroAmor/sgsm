@@ -39,7 +39,9 @@ public class ReservaHorarioService {
     static final String INDICE_DONO = "sgsm:reservas:dono:";
     static final String TRAVA = "sgsm:trava:reserva:";
     static final Duration TTL_TRAVA = Duration.ofSeconds(5);
-    static final Duration TTL_INDICE = Duration.ofDays(1);
+    // Renovado a cada reserva criada: como nenhuma reserva vive mais que DURACAO_MAXIMA, o índice
+    // some logo depois da última reserva expirar (sem deixar token órfão no Redis)
+    static final Duration TTL_INDICE = DURACAO_MAXIMA.plusMinutes(1);
     static final int TENTATIVAS_TRAVA = 20;
 
     private static final RedisScript<Long> LIBERAR_SE_DONO = new DefaultRedisScript<>(

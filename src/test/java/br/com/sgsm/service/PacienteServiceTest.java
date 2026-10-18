@@ -67,6 +67,29 @@ class PacienteServiceTest {
         lenient().when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(null);
     }
 
+    @Test
+    void cpfOuEmailJaCadastradoConsultaPorHashDoCpfEPorEmail() {
+        String hash = cpfCryptoService.hash("52998224725");
+        when(repository.existsByCpfHash(hash)).thenReturn(false, true);
+        when(repository.existsByEmail("a@b.com")).thenReturn(true);
+        when(repository.existsByEmail("livre@b.com")).thenReturn(false);
+
+        assertThat(service.cpfOuEmailJaCadastrado("529.982.247-25", "livre@b.com")).isFalse();
+        assertThat(service.cpfOuEmailJaCadastrado("529.982.247-25", "livre@b.com")).isTrue();
+        assertThat(service.cpfOuEmailJaCadastrado(null, "a@b.com")).isTrue();
+        assertThat(service.cpfOuEmailJaCadastrado(null, null)).isFalse();
+    }
+
+    @Test
+    void removerAutoCadastroIncompletoApagaEPedeRemocaoDoVetor() {
+        var id = java.util.UUID.randomUUID();
+
+        service.removerAutoCadastroIncompleto(id);
+
+        verify(repository).deleteById(id);
+        verify(vetorizacaoPublisher).publicar("PACIENTE", id.toString(), "ANONIMIZAR");
+    }
+
     private Paciente novoPaciente() {
         var p = new Paciente();
         ReflectionTestUtils.setField(p, "id", UUID.randomUUID());

@@ -60,6 +60,29 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void errosDoAutoCadastroPublicoTemStatusProprios() {
+        when(request.getRequestURI()).thenReturn("/v1/api/publico/pacientes");
+
+        assertThat(handler.handleCadastroIndisponivel(new CadastroIndisponivelException("x"), request).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(handler.handleMuitasTentativas(new MuitasTentativasException("x"), request).getStatusCode())
+                .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(handler.handleServicoIndisponivel(new ServicoIndisponivelException("x", null), request).getStatusCode())
+                .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    void erroInesperadoVira500GenericoParaOCliente() {
+        when(request.getRequestURI()).thenReturn("/v1/api/agendamentos");
+        when(request.getMethod()).thenReturn("POST");
+
+        ResponseEntity<ProblemDetail> response = handler.handleErroInterno(new IllegalStateException("detalhe interno"), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody().getDetail()).doesNotContain("detalhe interno");
+    }
+
+    @Test
     void deveRetornar404QuandoRecursoNaoEncontrado() {
         when(request.getRequestURI()).thenReturn("/v1/api/medicos/123");
         var ex = new RecursoNaoEncontradoException("Médico não encontrado: 123");

@@ -29,6 +29,11 @@ jwt:
   secret: ${JWT_SECRET}
 
 sgsm:
+  # Auto-cadastro público de paciente: o sgsm cria o login no ms-sboot-auth (servidor a servidor)
+  auth:
+    base-url: ${AUTH_BASE_URL}
+  autocadastro:
+    limite-por-ip: 5
   crypto:
     cpf-key: ${CPF_CRYPTO_KEY}
     cpf-hmac-key: ${CPF_HMAC_KEY}

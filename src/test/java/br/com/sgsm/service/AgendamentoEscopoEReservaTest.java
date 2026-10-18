@@ -145,6 +145,20 @@ class AgendamentoEscopoEReservaTest {
 
     // ── Fase 1: escopo por papel ──────────────────────────────────────────────
 
+    // Rodada 8 do QA: o bot mandou o pedido sem o serviço (a IA não o extraiu) e o sgsm devolvia 500
+    @Test
+    void pedidoSemServicoMedicoE400ENao500() {
+        var semServicoAgendamento = new CadastrarAgendamentoRequest(PACIENTE, null, CLINICA_A,
+                TipoAgendamento.PRESENCIAL, DEZ_HORAS, null, null);
+        var semServicoReserva = new CriarReservaRequest(null, CLINICA_A, TipoAgendamento.PRESENCIAL, DEZ_HORAS);
+
+        assertThatThrownBy(() -> service.cadastrar(semServicoAgendamento))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("serviço médico");
+        assertThatThrownBy(() -> service.reservar(semServicoReserva))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("serviço médico");
+        verifyNoInteractions(servicoMedicoRepository);
+    }
+
     @Test
     void secretariaNaoVeGradeNemDiasDeOutraClinica() {
         comoSecretariaDaClinicaA();

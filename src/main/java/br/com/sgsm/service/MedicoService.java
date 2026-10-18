@@ -1,12 +1,14 @@
 package br.com.sgsm.service;
 
 import br.com.sgsm.domain.Medico;
+import br.com.sgsm.domain.MedicoEstabelecimento;
 import br.com.sgsm.dto.AtualizarMedicoRequest;
 import br.com.sgsm.dto.CadastrarMedicoRequest;
 import br.com.sgsm.dto.MedicoResponse;
 import br.com.sgsm.events.VetorizacaoPublisher;
 import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
+import br.com.sgsm.repository.MedicoEstabelecimentoRepository;
 import br.com.sgsm.repository.MedicoRepository;
 import br.com.sgsm.security.ContextoSeguranca;
 import br.com.sgsm.security.EstabelecimentoAcessoService;
@@ -14,6 +16,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,15 +29,18 @@ public class MedicoService {
     private final ContextoSeguranca contextoSeguranca;
     private final VetorizacaoPublisher vetorizacaoPublisher;
     private final EstabelecimentoAcessoService estabelecimentoAcessoService;
+    private final MedicoEstabelecimentoRepository medicoEstabelecimentoRepository;
 
     public MedicoService(MedicoRepository repository, ModelMapper modelMapper,
                          ContextoSeguranca contextoSeguranca, VetorizacaoPublisher vetorizacaoPublisher,
-                         EstabelecimentoAcessoService estabelecimentoAcessoService) {
+                         EstabelecimentoAcessoService estabelecimentoAcessoService,
+                         MedicoEstabelecimentoRepository medicoEstabelecimentoRepository) {
         this.repository = repository;
         this.modelMapper = modelMapper;
         this.contextoSeguranca = contextoSeguranca;
         this.vetorizacaoPublisher = vetorizacaoPublisher;
         this.estabelecimentoAcessoService = estabelecimentoAcessoService;
+        this.medicoEstabelecimentoRepository = medicoEstabelecimentoRepository;
     }
 
     public MedicoResponse cadastrar(CadastrarMedicoRequest request) {
@@ -45,12 +51,39 @@ public class MedicoService {
         if (repository.existsByEmail(request.email())) {
             throw new IllegalArgumentException("E-mail já cadastrado: " + request.email());
         }
+        UUID clinica = clinicaDoNovoMedico(request.estabelecimentoId());
 
         var medico = modelMapper.map(request, Medico.class);
         medico.setCrmUf(medico.getCrmUf().toUpperCase());
         var salvo = repository.save(medico);
+        if (clinica != null) {
+            medicoEstabelecimentoRepository.save(new MedicoEstabelecimento(salvo.getId(), clinica));
+        }
         vetorizacaoPublisher.publicar("MEDICO", salvo.getId().toString(), "CREATE");
         return modelMapper.map(salvo, MedicoResponse.class);
+    }
+
+    // Médico cadastrado por FUNCIONARIO/ADMIN_ESTABELECIMENTO nasce vinculado à clínica de quem
+    // cadastra: sem isso ele sumia da lista de quem o criou (escopo por clínica) e ficava sem convite.
+    // DESENVOLVEDOR (irrestrito) vincula só se informar a clínica.
+    private UUID clinicaDoNovoMedico(UUID informada) {
+        List<UUID> permitidas = estabelecimentoAcessoService.estabelecimentosPermitidos();
+        if (permitidas == null) {
+            return informada;
+        }
+        if (informada != null) {
+            if (!permitidas.contains(informada)) {
+                throw new AcessoNegadoException("Acesso negado ao estabelecimento: " + informada);
+            }
+            return informada;
+        }
+        if (permitidas.size() == 1) {
+            return permitidas.get(0);
+        }
+        if (permitidas.isEmpty()) {
+            throw new AcessoNegadoException("Seu usuário não está vinculado a nenhum estabelecimento.");
+        }
+        throw new IllegalArgumentException("Informe o estabelecimento em que o médico vai atender.");
     }
 
     @Transactional(readOnly = true)
@@ -108,6 +141,14 @@ public class MedicoService {
     public List<MedicoResponse> listar(Boolean ativo, String especialidade) {
         List<Medico> resultado;
         List<UUID> medicosPermitidos = estabelecimentoAcessoService.medicosPermitidos();
+
+        // o médico sempre vê o próprio cadastro, mesmo ainda sem clínica vinculada
+        if (medicosPermitidos != null && contextoSeguranca.isMedico()
+                && contextoSeguranca.getReferenciaId() != null
+                && !medicosPermitidos.contains(contextoSeguranca.getReferenciaId())) {
+            medicosPermitidos = new ArrayList<>(medicosPermitidos);
+            medicosPermitidos.add(contextoSeguranca.getReferenciaId());
+        }
 
         if (medicosPermitidos != null) {
             resultado = medicosPermitidos.isEmpty() ? List.of() : (List<Medico>) repository.findAllById(medicosPermitidos);

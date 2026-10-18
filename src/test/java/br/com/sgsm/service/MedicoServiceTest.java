@@ -7,6 +7,8 @@ import br.com.sgsm.dto.CadastrarMedicoRequest;
 import br.com.sgsm.exception.AcessoNegadoException;
 import br.com.sgsm.exception.RecursoNaoEncontradoException;
 import br.com.sgsm.events.VetorizacaoPublisher;
+import br.com.sgsm.domain.MedicoEstabelecimento;
+import br.com.sgsm.repository.MedicoEstabelecimentoRepository;
 import br.com.sgsm.repository.MedicoRepository;
 import org.springframework.test.util.ReflectionTestUtils;
 import br.com.sgsm.security.ContextoSeguranca;
@@ -37,16 +39,97 @@ class MedicoServiceTest {
     private VetorizacaoPublisher vetorizacaoPublisher;
     @Mock
     private EstabelecimentoAcessoService estabelecimentoAcessoService;
+    @Mock
+    private MedicoEstabelecimentoRepository medicoEstabelecimentoRepository;
 
     private MedicoService service;
 
     @BeforeEach
     void setUp() {
         service = new MedicoService(repository, new ModelMapperConfig().modelMapper(), contextoSeguranca,
-                vetorizacaoPublisher, estabelecimentoAcessoService);
+                vetorizacaoPublisher, estabelecimentoAcessoService, medicoEstabelecimentoRepository);
         // Mockito retorna List vazia (nao null) para metodo List<> nao-stubado - sem isso,
         // o service entenderia "escopado a zero medicos" em vez de "irrestrito".
         lenient().when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(null);
+        lenient().when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(null);
+    }
+
+    private void salvaComId() {
+        when(repository.save(any(Medico.class))).thenAnswer(inv -> {
+            var e = inv.getArgument(0);
+            ReflectionTestUtils.setField(e, "id", UUID.randomUUID());
+            return e;
+        });
+    }
+
+    private static CadastrarMedicoRequest pedido(UUID clinica) {
+        return new CadastrarMedicoRequest("Dra. Ana", "999", "SP", "Cardiologia", "ana2@sgsm.com.br", null, clinica);
+    }
+
+    // Médico cadastrado pela secretária já nasce na clínica dela (senão some da lista dela e não recebe convite)
+    @Test
+    void medicoCadastradoPelaSecretariaNasceVinculadoAClinicaDela() {
+        UUID clinica = UUID.randomUUID();
+        when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(List.of(clinica));
+        salvaComId();
+
+        var response = service.cadastrar(pedido(null));
+
+        var vinculo = org.mockito.ArgumentCaptor.forClass(MedicoEstabelecimento.class);
+        verify(medicoEstabelecimentoRepository).save(vinculo.capture());
+        assertThat(vinculo.getValue().getId().getEstabelecimentoId()).isEqualTo(clinica);
+        assertThat(vinculo.getValue().getId().getMedicoId()).isEqualTo(response.getId());
+        // STRICT: o estabelecimentoId do pedido não vira o id do médico
+        assertThat(response.getId()).isNotEqualTo(clinica);
+    }
+
+    @Test
+    void adminComVariasClinicasPrecisaEscolherUmaDasSuas() {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(List.of(a, b));
+
+        assertThatThrownBy(() -> service.cadastrar(pedido(null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Informe o estabelecimento");
+        assertThatThrownBy(() -> service.cadastrar(pedido(UUID.randomUUID())))
+                .isInstanceOf(AcessoNegadoException.class);
+        verify(repository, never()).save(any());
+
+        salvaComId();
+        service.cadastrar(pedido(b));
+        var vinculo = org.mockito.ArgumentCaptor.forClass(MedicoEstabelecimento.class);
+        verify(medicoEstabelecimentoRepository).save(vinculo.capture());
+        assertThat(vinculo.getValue().getId().getEstabelecimentoId()).isEqualTo(b);
+    }
+
+    @Test
+    void equipeSemClinicaNaoCadastraMedico() {
+        when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.cadastrar(pedido(null))).isInstanceOf(AcessoNegadoException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void desenvolvedorSoVinculaSeInformarAClinica() {
+        salvaComId();
+        service.cadastrar(pedido(null));
+        verify(medicoEstabelecimentoRepository, never()).save(any());
+
+        UUID clinica = UUID.randomUUID();
+        service.cadastrar(pedido(clinica));
+        verify(medicoEstabelecimentoRepository).save(any(MedicoEstabelecimento.class));
+    }
+
+    @Test
+    void medicoSemClinicaVeOProprioCadastroNaLista() {
+        var eu = novoMedico();
+        when(contextoSeguranca.isMedico()).thenReturn(true);
+        when(contextoSeguranca.getReferenciaId()).thenReturn(eu.getId());
+        when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(List.of());
+        when(repository.findAllById(List.of(eu.getId()))).thenReturn(List.of(eu));
+
+        assertThat(service.listar(null, null)).extracting("id").containsExactly(eu.getId());
     }
 
     private Medico novoMedico() {
