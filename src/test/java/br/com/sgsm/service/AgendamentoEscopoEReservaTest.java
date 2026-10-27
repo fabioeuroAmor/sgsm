@@ -74,6 +74,7 @@ class AgendamentoEscopoEReservaTest {
                 reservas);
         lenient().when(contexto.getUsuarioId()).thenReturn("secretaria-a");
         lenient().when(acesso.estabelecimentosPermitidos()).thenReturn(null);
+        lenient().when(medicoEstabelecimentoRepository.existsVinculoAtivo(any(), anyList())).thenReturn(true);
     }
 
     // ── fixtures ──────────────────────────────────────────────────────────────
@@ -144,6 +145,21 @@ class AgendamentoEscopoEReservaTest {
     }
 
     // ── Fase 1: escopo por papel ──────────────────────────────────────────────
+
+    // WhatsApp por clínica: mesmo que a IA ofereça serviço de médico de outra clínica, o agendamento
+    // presencial na clínica do canal é recusado
+    @Test
+    void medicoQueNaoAtendeNaClinicaNaoEhAgendadoNemReservadoLa() {
+        servicoAtivo();
+        pacienteEClinicaExistem();
+        when(medicoEstabelecimentoRepository.existsVinculoAtivo(MEDICO, List.of(CLINICA_B))).thenReturn(false);
+
+        assertThatThrownBy(() -> service.cadastrar(pedido(CLINICA_B, TipoAgendamento.PRESENCIAL, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("não atende neste estabelecimento");
+        assertThatThrownBy(() -> service.reservar(new CriarReservaRequest(SERVICO, CLINICA_B, TipoAgendamento.PRESENCIAL, DEZ_HORAS)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("não atende neste estabelecimento");
+        verify(agendamentoRepository, never()).saveAndFlush(any());
+    }
 
     // Rodada 8 do QA: o bot mandou o pedido sem o serviço (a IA não o extraiu) e o sgsm devolvia 500
     @Test

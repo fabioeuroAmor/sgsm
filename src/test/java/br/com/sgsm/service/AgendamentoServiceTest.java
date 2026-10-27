@@ -76,6 +76,7 @@ class AgendamentoServiceTest {
         // Mockito retorna List vazia (nao null) para metodo List<> nao-stubado - sem isso,
         // o service entenderia "escopado a zero estabelecimentos" em vez de "irrestrito".
         lenient().when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(null);
+        lenient().when(medicoEstabelecimentoRepository.existsVinculoAtivo(any(), anyList())).thenReturn(true);
     }
 
     // ---------- Fixtures ----------

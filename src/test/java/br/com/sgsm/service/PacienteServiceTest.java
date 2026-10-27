@@ -4,6 +4,7 @@ import br.com.sgsm.config.ModelMapperConfig;
 import br.com.sgsm.domain.AcaoAuditoria;
 import br.com.sgsm.domain.Agendamento;
 import br.com.sgsm.domain.Paciente;
+import br.com.sgsm.domain.PacienteEstabelecimento;
 import br.com.sgsm.dto.AtualizarPacienteRequest;
 import br.com.sgsm.dto.CadastrarPacienteRequest;
 import br.com.sgsm.exception.AcessoNegadoException;
@@ -50,6 +51,8 @@ class PacienteServiceTest {
     private AgendamentoService agendamentoService;
     @Mock
     private EstabelecimentoAcessoService estabelecimentoAcessoService;
+    @Mock
+    private PacienteClinicaService pacienteClinicaService;
 
     private CpfCryptoService cpfCryptoService;
     private PacienteService service;
@@ -61,7 +64,7 @@ class PacienteServiceTest {
         cpfCryptoService = new CpfCryptoService(chaveAes, chaveHmac);
         service = new PacienteService(repository, agendamentoRepository,
                 new ModelMapperConfig().modelMapper(), contextoSeguranca, vetorizacaoPublisher, auditoriaService,
-                cpfCryptoService, agendamentoService, estabelecimentoAcessoService);
+                cpfCryptoService, agendamentoService, estabelecimentoAcessoService, pacienteClinicaService);
         // Mockito retorna List vazia (nao null) para metodo List<> nao-stubado - sem isso,
         // o service entenderia "escopado a zero medicos" em vez de "irrestrito".
         lenient().when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(null);
@@ -222,6 +225,49 @@ class PacienteServiceTest {
 
         assertThatThrownBy(() -> service.consultar(id))
                 .isInstanceOf(AcessoNegadoException.class);
+    }
+
+    // QA WA-E02: a equipe de outra clínica não lê nem edita o paciente pelo id
+    @Test
+    void equipeSoConsultaPacienteAtendidoOuVinculadoNaSuaClinica() {
+        UUID atendido = UUID.randomUUID();
+        UUID vinculado = UUID.randomUUID();
+        UUID deOutraClinica = UUID.randomUUID();
+        UUID medicoDaClinica = UUID.randomUUID();
+        UUID clinica = UUID.randomUUID();
+        when(contextoSeguranca.isFuncionario()).thenReturn(true);
+        when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(List.of(medicoDaClinica));
+        when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(List.of(clinica));
+        var consulta = novoAgendamento(atendido);
+        consulta.setMedicoId(medicoDaClinica);
+        when(agendamentoRepository.findAllByPacienteId(atendido)).thenReturn(List.of(consulta));
+        when(agendamentoRepository.findAllByPacienteId(vinculado)).thenReturn(List.of());
+        when(pacienteClinicaService.vinculosDoPaciente(vinculado))
+                .thenReturn(List.of(new PacienteEstabelecimento(vinculado, clinica, "WHATSAPP")));
+        var deOutroMedico = novoAgendamento(deOutraClinica);
+        deOutroMedico.setMedicoId(UUID.randomUUID());
+        when(agendamentoRepository.findAllByPacienteId(deOutraClinica)).thenReturn(List.of(deOutroMedico));
+        when(pacienteClinicaService.vinculosDoPaciente(deOutraClinica))
+                .thenReturn(List.of(new PacienteEstabelecimento(deOutraClinica, UUID.randomUUID(), "WHATSAPP")));
+        when(repository.findById(any())).thenReturn(Optional.of(novoPaciente()));
+
+        assertThat(service.consultar(atendido)).isNotNull();
+        assertThat(service.consultar(vinculado)).isNotNull();
+        assertThatThrownBy(() -> service.consultar(deOutraClinica)).isInstanceOf(AcessoNegadoException.class);
+        assertThatThrownBy(() -> service.atualizar(deOutraClinica, null)).isInstanceOf(AcessoNegadoException.class);
+        verify(auditoriaService, never()).registrar("PACIENTE", deOutraClinica, AcaoAuditoria.LEITURA);
+    }
+
+    @Test
+    void adminSemClinicaNaoConsultaNinguem() {
+        UUID id = UUID.randomUUID();
+        when(contextoSeguranca.isAdminEstabelecimento()).thenReturn(true);
+        when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(List.of());
+        when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(List.of());
+        when(pacienteClinicaService.vinculosDoPaciente(id)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.consultar(id)).isInstanceOf(AcessoNegadoException.class);
+        verifyNoInteractions(repository);
     }
 
     @Test
@@ -496,11 +542,50 @@ class PacienteServiceTest {
         when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(List.of(medicoId));
         when(agendamentoRepository.findPacienteIdsDistintosByMedicoIdIn(List.of(medicoId)))
                 .thenReturn(List.of(paciente.getId()));
-        when(repository.findAllById(List.of(paciente.getId()))).thenReturn(List.of(paciente));
+        when(repository.findAllById(java.util.Set.of(paciente.getId()))).thenReturn(List.of(paciente));
 
         var resultado = service.listar(null);
 
         assertThat(resultado).hasSize(1);
+    }
+
+    // WhatsApp por clínica (V015): paciente que chegou pelo número da clínica ou foi cadastrado por
+    // ela aparece para a equipe antes do primeiro agendamento
+    @Test
+    void equipeVeTambemPacientesVinculadosAClinicaSemAgendamento() {
+        UUID medicoId = UUID.randomUUID();
+        UUID clinica = UUID.randomUUID();
+        var comAgendamento = novoPaciente();
+        var vindoDoWhatsApp = novoPaciente();
+        when(contextoSeguranca.isPaciente()).thenReturn(false);
+        when(estabelecimentoAcessoService.medicosPermitidos()).thenReturn(List.of(medicoId));
+        when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(List.of(clinica));
+        when(agendamentoRepository.findPacienteIdsDistintosByMedicoIdIn(List.of(medicoId)))
+                .thenReturn(List.of(comAgendamento.getId()));
+        when(pacienteClinicaService.pacientesDasClinicas(List.of(clinica)))
+                .thenReturn(List.of(vindoDoWhatsApp.getId(), comAgendamento.getId()));
+        when(repository.findAllById(java.util.Set.of(comAgendamento.getId(), vindoDoWhatsApp.getId())))
+                .thenReturn(List.of(comAgendamento, vindoDoWhatsApp));
+
+        assertThat(service.listar(null)).hasSize(2);
+    }
+
+    @Test
+    void pacienteCadastradoPelaEquipeJaFicaVinculadoAsClinicasDela() {
+        UUID clinica = UUID.randomUUID();
+        when(estabelecimentoAcessoService.estabelecimentosPermitidos()).thenReturn(List.of(clinica));
+        when(repository.existsByCpfHash(any())).thenReturn(false);
+        when(repository.existsByEmail(any())).thenReturn(false);
+        when(repository.save(any(Paciente.class))).thenAnswer(inv -> {
+            var p = (Paciente) inv.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(p, "id", UUID.randomUUID());
+            return p;
+        });
+
+        var criado = service.cadastrar(new br.com.sgsm.dto.CadastrarPacienteRequest("Maria", "52998224725",
+                java.time.LocalDate.of(1990, 1, 1), "m@a.com", null, null, null, null, null, null, null, null, true));
+
+        verify(pacienteClinicaService).vincularAsClinicas(criado.getId(), List.of(clinica));
     }
 
     @Test

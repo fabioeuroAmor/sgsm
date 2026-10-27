@@ -38,6 +38,8 @@ public class PacienteService {
     private final AgendamentoService agendamentoService;
     private final EstabelecimentoAcessoService estabelecimentoAcessoService;
 
+    private final PacienteClinicaService pacienteClinicaService;
+
     public PacienteService(PacienteRepository repository,
                            AgendamentoRepository agendamentoRepository,
                            ModelMapper modelMapper,
@@ -46,7 +48,9 @@ public class PacienteService {
                            AuditoriaService auditoriaService,
                            CpfCryptoService cpfCryptoService,
                            AgendamentoService agendamentoService,
-                           EstabelecimentoAcessoService estabelecimentoAcessoService) {
+                           EstabelecimentoAcessoService estabelecimentoAcessoService,
+                           PacienteClinicaService pacienteClinicaService) {
+        this.pacienteClinicaService = pacienteClinicaService;
         this.repository = repository;
         this.agendamentoRepository = agendamentoRepository;
         this.modelMapper = modelMapper;
@@ -78,6 +82,11 @@ public class PacienteService {
         paciente.setCpfHash(cpfHash);
         paciente.setConsentimentoLgpdEm(OffsetDateTime.now());
         var salvo = repository.save(paciente);
+        // cadastrado pela equipe: já fica vinculado às clínicas dela (origem CLINICA), antes de agendar
+        List<UUID> clinicasDaEquipe = estabelecimentoAcessoService.estabelecimentosPermitidos();
+        if (clinicasDaEquipe != null && !clinicasDaEquipe.isEmpty()) {
+            pacienteClinicaService.vincularAsClinicas(salvo.getId(), clinicasDaEquipe);
+        }
         vetorizacaoPublisher.publicar("PACIENTE", salvo.getId().toString(), "CREATE");
         auditoriaService.registrar("PACIENTE", salvo.getId(), AcaoAuditoria.CRIACAO);
         return modelMapper.map(salvo, PacienteResponse.class);
@@ -97,6 +106,7 @@ public class PacienteService {
                 throw new AcessoNegadoException("Acesso negado ao paciente: " + id);
             }
         }
+        exigirPacienteDaEquipe(id);
         var response = repository.findById(id)
                 .map(p -> modelMapper.map(p, PacienteResponse.class))
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Paciente não encontrado: " + id));
@@ -110,6 +120,7 @@ public class PacienteService {
         if (contextoSeguranca.isPaciente() && !id.equals(ref)) {
             throw new AcessoNegadoException("Paciente não pode editar dados de outro paciente: " + id);
         }
+        exigirPacienteDaEquipe(id);
         var paciente = buscarOuLancarErro(id);
 
         if (request.email() != null && repository.existsByEmailAndIdNot(request.email(), id)) {
@@ -161,8 +172,25 @@ public class PacienteService {
                 .map(p -> modelMapper.map(p, PacienteResponse.class))
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Paciente não encontrado: " + id));
         var agendamentos = agendamentoService.listar(id, null, null, null);
+        var clinicas = pacienteClinicaService.vinculosDoPaciente(id).stream()
+                .map(v -> java.util.Map.<String, Object>of(
+                        "estabelecimentoId", v.getId().getEstabelecimentoId(),
+                        "origem", v.getOrigem(),
+                        "primeiroContatoEm", v.getPrimeiroContatoEm()))
+                .toList();
+        var consentimentos = pacienteClinicaService.consentimentosDoPaciente(id).stream()
+                .map(c -> {
+                    var mapa = new java.util.LinkedHashMap<String, Object>();
+                    mapa.put("estabelecimentoId", c.getEstabelecimentoId());
+                    mapa.put("canal", c.getCanal());
+                    mapa.put("versaoTexto", c.getVersaoTexto());
+                    mapa.put("aceitoEm", c.getAceitoEm());
+                    mapa.put("revogadoEm", c.getRevogadoEm());
+                    return (java.util.Map<String, Object>) mapa;
+                })
+                .toList();
         auditoriaService.registrar("PACIENTE", id, AcaoAuditoria.EXPORTACAO);
-        return new PacienteExportacaoResponse(paciente, agendamentos);
+        return new PacienteExportacaoResponse(paciente, agendamentos, clinicas, consentimentos);
     }
 
     // UC - Anonimizar paciente (LGPD 3.3 — direito ao esquecimento, art. 18 da LGPD)
@@ -210,16 +238,22 @@ public class PacienteService {
                     .orElse(List.of());
         }
 
-        // FUNCIONARIO/ADMIN_ESTABELECIMENTO: só pacientes atendidos por médico vinculado
-        // ao(s) estabelecimento(s) do staff - via Agendamento.medicoId, não
-        // Agendamento.estabelecimentoId (que fica nulo em agendamento domiciliar), pra
-        // incluir paciente atendido só em domicílio por um médico da clínica.
+        // FUNCIONARIO/ADMIN_ESTABELECIMENTO: pacientes atendidos por médico vinculado ao(s)
+        // estabelecimento(s) do staff - via Agendamento.medicoId, não Agendamento.estabelecimentoId
+        // (que fica nulo em agendamento domiciliar), pra incluir paciente atendido só em domicílio
+        // por um médico da clínica - MAIS os vinculados à clínica (V015: chegou pelo WhatsApp da
+        // clínica ou foi cadastrado por ela), que ainda não têm agendamento.
         List<UUID> medicosPermitidos = estabelecimentoAcessoService.medicosPermitidos();
         if (medicosPermitidos != null) {
-            List<Paciente> resultado = medicosPermitidos.isEmpty()
-                    ? List.of()
-                    : repository.findAllById(agendamentoRepository.findPacienteIdsDistintosByMedicoIdIn(medicosPermitidos))
-                            .stream().toList();
+            var ids = new java.util.LinkedHashSet<UUID>();
+            if (!medicosPermitidos.isEmpty()) {
+                ids.addAll(agendamentoRepository.findPacienteIdsDistintosByMedicoIdIn(medicosPermitidos));
+            }
+            List<UUID> clinicas = estabelecimentoAcessoService.estabelecimentosPermitidos();
+            if (clinicas != null && !clinicas.isEmpty()) {
+                ids.addAll(pacienteClinicaService.pacientesDasClinicas(clinicas));
+            }
+            List<Paciente> resultado = ids.isEmpty() ? List.of() : repository.findAllById(ids).stream().toList();
             if (ativo != null) {
                 final Boolean filtroAtivo = ativo;
                 resultado = resultado.stream().filter(p -> filtroAtivo.equals(p.getAtivo())).toList();
@@ -249,6 +283,30 @@ public class PacienteService {
     public void removerAutoCadastroIncompleto(UUID id) {
         repository.deleteById(id);
         vetorizacaoPublisher.publicar("PACIENTE", id.toString(), "ANONIMIZAR");
+    }
+
+    // FUNCIONARIO/ADMIN_ESTABELECIMENTO só leem/editam paciente do mesmo escopo do listar: atendido
+    // por médico da clínica ou vinculado a ela (V015). DESENVOLVEDOR (escopo nulo) não é restrito.
+    private void exigirPacienteDaEquipe(UUID id) {
+        if (!contextoSeguranca.isFuncionario() && !contextoSeguranca.isAdminEstabelecimento()) {
+            return;
+        }
+        List<UUID> medicosPermitidos = estabelecimentoAcessoService.medicosPermitidos();
+        if (medicosPermitidos == null) {
+            return;
+        }
+        boolean atendidoPelaClinica = !medicosPermitidos.isEmpty()
+                && agendamentoRepository.findAllByPacienteId(id).stream()
+                        .anyMatch(a -> medicosPermitidos.contains(a.getMedicoId()));
+        if (atendidoPelaClinica) {
+            return;
+        }
+        List<UUID> clinicas = estabelecimentoAcessoService.estabelecimentosPermitidos();
+        boolean vinculadoAClinica = clinicas != null && pacienteClinicaService.vinculosDoPaciente(id).stream()
+                .anyMatch(v -> clinicas.contains(v.getId().getEstabelecimentoId()));
+        if (!vinculadoAClinica) {
+            throw new AcessoNegadoException("Acesso negado ao paciente: " + id);
+        }
     }
 
     private Paciente buscarOuLancarErro(UUID id) {

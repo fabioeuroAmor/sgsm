@@ -232,6 +232,7 @@ public class AgendamentoService {
         OffsetDateTime dataHoraFim = dataHoraInicio.plusMinutes(duracao);
         UUID medicoId = servico.getMedicoId();
         validarEscopoAgenda(medicoId, request.estabelecimentoId(), tipo);
+        exigirMedicoDaClinica(medicoId, request.estabelecimentoId(), tipo);
         String dono = contextoSeguranca.getUsuarioId();
         var reservaPropria = request.reservaToken() == null || request.reservaToken().isBlank() ? null
                 : reservaHorarioService.validarParaConsumo(request.reservaToken(), dono, medicoId, dataHoraInicio);
@@ -427,6 +428,15 @@ public class AgendamentoService {
         return estabelecimentoAcessoService.medicoPermitido(medicoId);
     }
 
+    // Presencial numa clínica: o médico do serviço precisa atender nela (vínculo ativo). Defesa do
+    // WhatsApp por clínica: mesmo que a IA ofereça o serviço errado, a clínica do canal manda.
+    private void exigirMedicoDaClinica(UUID medicoId, UUID estabelecimentoId, TipoAgendamento tipo) {
+        if (tipo == TipoAgendamento.DOMICILIAR || estabelecimentoId == null) return;
+        if (!medicoEstabelecimentoRepository.existsVinculoAtivo(medicoId, List.of(estabelecimentoId))) {
+            throw new IllegalArgumentException("O médico deste serviço não atende neste estabelecimento.");
+        }
+    }
+
     // Sem serviço não há médico nem duração: 400 claro em vez do 500 do findById(null)
     // (o bot do WhatsApp chegou a enviar o pedido sem o serviço que a IA não extraiu)
     private static UUID exigirServico(UUID servicoMedicoId) {
@@ -452,6 +462,7 @@ public class AgendamentoService {
         UUID estabelecimentoId = tipo == TipoAgendamento.DOMICILIAR ? null : request.estabelecimentoId();
         UUID medicoId = servico.getMedicoId();
         validarEscopoAgenda(medicoId, estabelecimentoId, tipo);
+        exigirMedicoDaClinica(medicoId, estabelecimentoId, tipo);
 
         int duracao = servico.getDuracaoMinutos() != null ? servico.getDuracaoMinutos() : 30;
         OffsetDateTime inicio = request.dataHoraInicio();

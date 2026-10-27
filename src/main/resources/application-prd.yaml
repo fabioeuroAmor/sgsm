@@ -29,6 +29,13 @@ jwt:
   secret: ${JWT_SECRET}
 
 sgsm:
+  # WhatsApp por clínica: o sgsm cria a instância (número) na Evolution com o webhook do bot
+  whatsapp:
+    evolution:
+      base-url: ${EVOLUTION_API_URL}
+      api-key: ${EVOLUTION_API_KEY}
+    webhook-url: ${WHATSAPP_WEBHOOK_URL}
+    webhook-secret: ${EVOLUTION_WEBHOOK_SECRET}
   # Auto-cadastro público de paciente: o sgsm cria o login no ms-sboot-auth (servidor a servidor)
   auth:
     base-url: ${AUTH_BASE_URL}

@@ -39,6 +39,8 @@ public class SecurityConfig {
                 .requestMatchers("/error").permitAll()
                 // Auto-cadastro público de paciente (limite por IP e ativação por e-mail no service)
                 .requestMatchers(HttpMethod.POST, "/v1/api/publico/pacientes").permitAll()
+                // Endpoints do ms-whatsapp-bot (token de sistema): canal da clínica, vínculo e consentimento
+                .requestMatchers("/v1/api/interno/**").hasRole("DESENVOLVEDOR")
                 // Medicos: MEDICO so ve a si mesmo; FUNCIONARIO, ADMIN_ESTABELECIMENTO e
                 // DESENVOLVEDOR veem todos (escopados por estabelecimento no Service,
                 // exceto DESENVOLVEDOR); PACIENTE precisa listar para escolher medico/

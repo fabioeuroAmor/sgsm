@@ -176,11 +176,20 @@ public class EstabelecimentoService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Médico não encontrado: " + medicoId))
         );
 
+        var afetados = new java.util.LinkedHashSet<UUID>();
+        medicoEstabelecimentoRepository.findById_EstabelecimentoIdInAndAtivo(List.of(estabelecimentoId), true)
+                .forEach(me -> afetados.add(me.getId().getMedicoId()));
+        afetados.addAll(request.medicoIds());
+
         medicoEstabelecimentoRepository.deleteByEstabelecimentoId(estabelecimentoId);
 
         request.medicoIds().forEach(medicoId ->
             medicoEstabelecimentoRepository.save(new MedicoEstabelecimento(medicoId, estabelecimentoId))
         );
+
+        // WhatsApp por clínica: o documento do médico (e dos serviços dele, reindexados pelo sgsm-ia)
+        // leva as clínicas em que ele atende — quem entrou ou saiu da clínica precisa ser reindexado
+        afetados.forEach(medicoId -> vetorizacaoPublisher.publicar("MEDICO", medicoId.toString(), "UPDATE"));
     }
 
     private Estabelecimento buscarOuLancarErro(UUID id) {

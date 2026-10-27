@@ -129,6 +129,12 @@
 			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
 
+		<!-- Alerta por e-mail quando o WhatsApp de uma clínica desconecta -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
 		<!-- Observabilidade: log estruturado (JSON) + tracing distribuido (traceId/spanId
 		     propagados via header traceparent, e injetados automaticamente no MDC) -->
 		<dependency>

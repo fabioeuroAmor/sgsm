@@ -373,10 +373,17 @@ class EstabelecimentoServiceTest {
         when(medicoRepository.findById(medicoId)).thenReturn(Optional.of(new Medico()));
         var request = new AssociarMedicosRequest(List.of(medicoId));
 
+        UUID medicoQueSaiu = UUID.randomUUID();
+        when(medicoEstabelecimentoRepository.findById_EstabelecimentoIdInAndAtivo(List.of(estabelecimentoId), true))
+                .thenReturn(List.of(new MedicoEstabelecimento(medicoQueSaiu, estabelecimentoId)));
+
         service.associarMedicos(estabelecimentoId, request);
 
         verify(medicoEstabelecimentoRepository).deleteByEstabelecimentoId(estabelecimentoId);
         verify(medicoEstabelecimentoRepository).save(any(MedicoEstabelecimento.class));
+        // quem entrou e quem saiu da clínica é reindexado (etiquetas de clínica no Milvus)
+        verify(vetorizacaoPublisher).publicar("MEDICO", medicoId.toString(), "UPDATE");
+        verify(vetorizacaoPublisher).publicar("MEDICO", medicoQueSaiu.toString(), "UPDATE");
     }
 
     @Test
